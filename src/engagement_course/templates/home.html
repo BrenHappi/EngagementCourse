@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+</head>
+<body>
+  <h1>Bonjour {{ username }}</h1>
+
+  <form method="get" action="{{ url_for('auth.logout') }}">
+    <button type="submit">Logout</button>
+  </form>
+</body>
+</html>
