@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime
-from .config import FFC_CALENDAR_URL
-from .models import RaceEvent, Category
+from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
+from engagement_course.models import RaceEvent, Category
 
 FRENCH_MONTHS = {
     "janvier": "01", "février": "02", "mars": "03", "avril": "04",
@@ -11,8 +11,11 @@ FRENCH_MONTHS = {
 }
 
 class FFCParser:
-    def __init__(self, url=FFC_CALENDAR_URL):
-        self.url = url
+    def __init__(self, department: int=35):
+        self.department = department
+        self.url = FFC_CALENDAR_URLS.get(department)
+        if self.url is None:
+            raise ValueError(f"No calendar URL configured for department {department}. Please check FFC_CALENDAR_URLS in config.py.")
 
     def fetch_calendar(self) -> str:
         """
@@ -21,13 +24,13 @@ class FFCParser:
         Returns:
             The raw HTML content as a string.
         """
-        response = requests.get(self.url)
+        response = requests.get(self.url, timeout=15)
         if response.status_code == 200:
             return response.text
         else:
             raise Exception(f"Failed to fetch calendar: {response.status_code}")
 
-    def parse_calendar(self, html: str) -> list:
+    def parse_calendar(self, html: str) -> list[RaceEvent]:
         """
         Parses the HTML content to extract event details.
 
@@ -57,31 +60,12 @@ class FFCParser:
                     raise Exception(f"Unexpected number of cells: {len(cells)}.\nRow content: {row}")
                 race = RaceEvent(
                         race_day = day.split()[0],
-                        date=datetime.datetime.strptime(day.split()[1]+"/"+month_num+"/"+year, "%d/%m/%Y").date().strftime('%d-%m-%Y'),
+                        date=datetime.datetime.strptime(day.split()[1]+"/"+month_num+"/"+year, "%d/%m/%Y").date(),
                         location=cells[1-index_offset].text.strip().replace(" .", ""),
+                        department=self.department,
                         federation=cells[2-index_offset].text.strip(),
                         type=cells[3-index_offset].text.strip(),
-                        categories=self.parse_categories(cells[4-index_offset].text.strip())
+                        categories=Category.from_string(cells[4-index_offset].text.strip())
                     )
                 races.append(race)
         return races
-
-    def parse_categories(self, raw_category: str) -> list[Category]:
-        """
-        Parses a raw category string into a list of Category objects.
-
-        Args:
-            raw_category: The raw category string (e.g., "OPEN 1,2,3 + ACCESS 1 ET 2").
-        Returns:
-            A list of Category objects.
-        """
-        category_labels = ["OPEN", "ACCESS"]
-        categories = []
-        for part in raw_category.split('+'):
-            level = next((label for label in category_labels if label in part), None)
-            if level is None:
-                continue  # Skip unsupported categories
-            for c in part:
-                if c.isdigit():
-                    categories.append(Category(level=level, number=int(c)))
-        return categories

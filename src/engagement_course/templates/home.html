@@ -1,14 +1,165 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <title>Home</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Engagement Course - V1</title>
 </head>
 <body>
-  <h1>Bonjour {{ username }}</h1>
+	<header>
+		<h1>Courses</h1>
+		<p>Bonjour {{ username }}</p>
+		<form method="get" action="{{ url_for('auth.logout') }}">
+			<button type="submit">Logout</button>
+		</form>
+	</header>
 
-  <form method="get" action="{{ url_for('auth.logout') }}">
-    <button type="submit">Logout</button>
-  </form>
+	<section>
+		<h2>Filtres</h2>
+		{% set selected_departments = request.args.getlist('department') %}
+		{% set selected_categories = request.args.getlist('category') %}
+		<form method="get" action="{{ url_for('main.index') }}">
+			<fieldset>
+				<legend>Département</legend>
+				{% for dept in available_departments %}
+					<label>
+						<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}>
+						{{ dept }}
+					</label>
+				{% endfor %}
+			</fieldset>
+
+			<fieldset>
+				<legend>Catégorie</legend>
+				{% for level, numbers in available_category_filters.items() %}
+					{% for num in numbers %}
+						{% set key = level ~ '_' ~ num %}
+						<label>
+							<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
+							{{ level }} {{ num }}
+						</label>
+					{% endfor %}
+				{% endfor %}
+			</fieldset>
+
+			<label for="date_from">Du</label>
+			<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ request.args.get('date_from', '') }}">
+
+			<label for="date_to">Au</label>
+			<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ request.args.get('date_to', '') }}">
+
+			<button type="submit">Appliquer</button>
+		</form>
+	</section>
+
+	<main>
+		<h2>Liste des courses</h2>
+		{% if races %}
+			<ul>
+				{% for race in races %}
+					<li>
+						<button type="button" class="race-card" data-modal-id="race-modal-{{ loop.index0 }}">
+							{{ race.race_day }} {{ race.date }} - {{ race.location }} ({{ race.department }})
+						</button>
+
+						<div>Federation: {{ race.federation }}</div>
+						<div>Type: {{ race.type }}</div>
+						<div>
+							Categories:
+							{% if race.categories %}
+								{% for category in race.categories %}
+									{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
+								{% endfor %}
+							{% else %}
+								aucune
+							{% endif %}
+						</div>
+						<div>Coureurs: non implemente V1</div>
+					</li>
+				{% endfor %}
+			</ul>
+		{% else %}
+			<p>Aucune course trouvee.</p>
+		{% endif %}
+	</main>
+
+	{% for race in races %}
+		<dialog id="race-modal-{{ loop.index0 }}">
+			<article>
+				<h3>{{ race.race_day }} {{ race.date }} - {{ race.location }} ({{ race.department }})</h3>
+				<p>Federation: {{ race.federation }}</p>
+				<p>Type: {{ race.type }}</p>
+				<p>
+					Categories:
+					{% if race.categories %}
+						{% for category in race.categories %}
+							{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
+						{% endfor %}
+					{% else %}
+						aucune
+					{% endif %}
+				</p>
+				<p>Inscription non implementee en V1.</p>
+				<button type="button" class="close-modal">Fermer</button>
+			</article>
+		</dialog>
+	{% endfor %}
+
+	<script>
+		(function () {
+			function openDialog(dialog) {
+				if (!dialog) {
+					return;
+				}
+
+				if (typeof dialog.showModal === "function") {
+					dialog.showModal();
+				} else {
+					dialog.setAttribute("open", "open");
+				}
+			}
+
+			function closeDialog(dialog) {
+				if (!dialog) {
+					return;
+				}
+
+				if (typeof dialog.close === "function") {
+					dialog.close();
+				} else {
+					dialog.removeAttribute("open");
+				}
+			}
+
+			document.querySelectorAll(".race-card").forEach(function (card) {
+				card.addEventListener("click", function () {
+					var modalId = card.getAttribute("data-modal-id");
+					var modal = document.getElementById(modalId);
+					openDialog(modal);
+				});
+			});
+
+			document.querySelectorAll("dialog .close-modal").forEach(function (button) {
+				button.addEventListener("click", function () {
+					closeDialog(button.closest("dialog"));
+				});
+			});
+
+			document.querySelectorAll("dialog").forEach(function (dialog) {
+				dialog.addEventListener("click", function (event) {
+					var rect = dialog.getBoundingClientRect();
+					var isInDialog =
+						rect.top <= event.clientY &&
+						event.clientY <= rect.top + rect.height &&
+						rect.left <= event.clientX &&
+						event.clientX <= rect.left + rect.width;
+
+					if (!isInDialog) {
+						closeDialog(dialog);
+					}
+				});
+			});
+		})();
+	</script>
 </body>
 </html>

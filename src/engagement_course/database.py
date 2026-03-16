@@ -1,7 +1,8 @@
 import sqlite3
-from bcrypt import hashpw, gensalt, checkpw
-from .config import SQLITE_DB_PATH
-from .models import Category, RaceEvent, RaceFilter, User
+from bcrypt import hashpw, gensalt
+from datetime import datetime
+from engagement_course.config import SQLITE_DB_PATH, DATE_FORMAT
+from engagement_course.models import Category, RaceEvent, RaceFilter, User
 
 
 class DatabaseRepository:
@@ -24,6 +25,7 @@ class DatabaseRepository:
                     race_day TEXT NOT NULL,
                     date TEXT NOT NULL,
                     location TEXT NOT NULL,
+                    department INTEGER NOT NULL,
                     federation TEXT NOT NULL,
                     race_type TEXT NOT NULL
                 )
@@ -74,13 +76,14 @@ class DatabaseRepository:
                     continue    # skip races without categories
                 cursor = conn.execute(
                     """
-                    INSERT INTO races (race_day, date, location, federation, race_type)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO races (race_day, date, location, department, federation, race_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         race.race_day,
                         race.date,
                         race.location,
+                        race.department,
                         race.federation,
                         race.type,
                     ),
@@ -104,7 +107,7 @@ class DatabaseRepository:
         return self.search_races()
     
     def list_races_by_category(self, category: Category) -> list[RaceEvent]:
-        filters = RaceFilter(category=category)
+        filters = RaceFilter(category=[category])
         return self.search_races(filters)
 
     def search_races(self, filters: RaceFilter | None = None) -> list[RaceEvent]:
@@ -123,6 +126,11 @@ class DatabaseRepository:
         if f.location:
             where.append("r.location = ?")
             params.append(f.location)
+        
+        if f.department:
+            placeholders = ", ".join("?" * len(f.department))
+            where.append(f"r.department IN ({placeholders})")
+            params.extend(f.department)
 
         if f.federation:
             where.append("r.federation = ?")
@@ -133,18 +141,21 @@ class DatabaseRepository:
             params.append(f.type)
 
         if f.category:
-            where.append(
-                """
-                EXISTS (
-                    SELECT 1 FROM race_categories AS rc
-                    WHERE rc.race_id = r.id
-                    AND rc.level = ?
-                    AND rc.number = ?
+            cat_conditions = []
+            for cat in f.category:
+                cat_conditions.append(
+                    """
+                    EXISTS (
+                        SELECT 1 FROM race_categories AS rc
+                        WHERE rc.race_id = r.id
+                        AND rc.level = ?
+                        AND rc.number = ?
+                    )
+                    """
                 )
-                """
-            )
-            params.append(f.category.level)
-            params.append(f.category.number)
+                params.append(cat.level)
+                params.append(cat.number)
+            where.append("(" + " OR ".join(cat_conditions) + ")")
 
         query = f"""
         SELECT
@@ -152,6 +163,7 @@ class DatabaseRepository:
             r.race_day,
             r.date,
             r.location,
+            r.department,
             r.federation,
             r.race_type,
             rc.level AS category_level,
@@ -174,8 +186,9 @@ class DatabaseRepository:
             if race is None:
                 race = RaceEvent(
                     race_day=row["race_day"],
-                    date=row["date"],
+                    date=datetime.strptime(row["date"], "%Y-%m-%d"),
                     location=row["location"],
+                    department=row["department"],
                     federation=row["federation"],
                     type=row["race_type"],
                     categories=[],
@@ -190,7 +203,7 @@ class DatabaseRepository:
                     )
                 )
 
-        return sorted(races_by_id.values(), key=lambda r: self._cmp_dates(r.date))
+        return races_by_id.values()
 
     def create_user(self, name: str, email: str, password: str, role: str = "user") -> int:
         with self._connect() as conn:
@@ -249,8 +262,3 @@ class DatabaseRepository:
             return None
 
         return User(user_id=row["id"], name=row["name"], email=row["email"], password_hash=row["password"], role=row["role"])
-    
-    @staticmethod
-    def _cmp_dates(d):
-        j, m, a = d.split("-")
-        return (int(a), int(m), [int(z) for z in j.split('-')])

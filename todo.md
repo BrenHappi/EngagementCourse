@@ -18,11 +18,17 @@ Lorsque l'admin souhaite onboarder de nouveaux utilisateurs (par example, au dé
 
 ### Administration
 - valider l'inscription d'un coureur à une course
+- visualiser toutes les inscriptions à faire
+- marquer une inscription comme faite (et reverse le processus)
 - envoyer un récap hebdo par email
 
 ## Improvement
 - Parser les dates, distance, nb de tour
 - Courses des départements limitrophes
 - Filtre par distance
+- parser davantage de catégories
+
+## To Resolve:
+
 
 

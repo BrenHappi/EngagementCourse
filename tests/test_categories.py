@@ -1,6 +1,6 @@
 import unittest
 
-from engagement_course.ffc_parser import FFCParser
+from engagement_course.models import Category
 
 TEST_CASES = [
     ("OPEN 1,2,3", [("OPEN", 1), ("OPEN", 2), ("OPEN", 3)]),
@@ -14,9 +14,7 @@ TEST_CASES = [
 ]
 
 
-class TestFfcParser(unittest.TestCase):
-    def setUp(self) -> None:
-        self.parser = FFCParser()
+class TestCategories(unittest.TestCase):
 
     @staticmethod
     def _to_pairs(categories):
@@ -25,7 +23,7 @@ class TestFfcParser(unittest.TestCase):
     def test_parse_categories(self) -> None:
         for raw, expected in TEST_CASES:
             with self.subTest(raw=raw):
-                categories = self.parser.parse_categories(raw)
+                categories = Category.from_string(raw)
 
                 self.assertIsInstance(categories, list)
                 self.assertEqual(self._to_pairs(categories), expected)
