@@ -17,3 +17,6 @@ CATEGORY_FILTERS = {
     "OPEN": [1, 2, 3],
     "ACCESS": [1, 2, 3, 4],
 }
+
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="admin"

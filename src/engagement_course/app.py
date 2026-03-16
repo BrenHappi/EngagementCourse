@@ -8,7 +8,7 @@ from engagement_course.auth import auth_bp
 from engagement_course.routes import main_bp
 from engagement_course.database import DatabaseRepository
 from engagement_course.ffc_parser import FFCParser
-import engagement_course.config
+import engagement_course.config as config
 
 load_dotenv()
 lm = LoginManager()
@@ -19,7 +19,7 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
         return 0
 
     races = []
-    for department in engagement_course.config.FFC_CALENDAR_URLS:
+    for department in config.FFC_CALENDAR_URLS:
         parser = FFCParser(department=department)
         html = parser.fetch_calendar()
         races.extend(parser.parse_calendar(html))
@@ -32,7 +32,7 @@ def create_app() -> Flask:
     app.secret_key = secrets.token_hex(32)
     db = DatabaseRepository()
     app.config["repository"] = db
-    app.config['registration_token'] = engagement_course.config.REGISTRATION_TOKEN
+    app.config['registration_token'] = config.REGISTRATION_TOKEN
 
     try:
         seeded_count = seed_races_from_ffc(db)
@@ -42,7 +42,14 @@ def create_app() -> Flask:
         app.logger.exception("FFC seed failed at startup")
 
     if db.get_user_by_id(1) is None:
-        db.create_user("admin", getenv("ADMIN_EMAIL"), getenv("ADMIN_PASSWORD"), role="admin")
+        db.create_user(
+            firstname="admin",
+            lastname="admin",
+            email=config.ADMIN_EMAIL,
+            username="admin",
+            password=config.ADMIN_PASSWORD,
+            role="admin",
+        )
 
     lm.init_app(app)
     lm.login_view = "auth.login"
@@ -61,6 +68,6 @@ def create_app() -> Flask:
     app.register_blueprint(main_bp)
 
     # TMP: display registration token:
-    print(f"Registration token: {app.config['registration_token']}")
+    print(f"Registration URL: {app.config['registration_token']}")
 
     return app

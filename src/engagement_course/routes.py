@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app, request
+from flask import Blueprint, render_template, current_app, request, abort
 from flask_login import current_user, login_required
 from datetime import datetime
 from engagement_course.models import RaceFilter, Category
@@ -36,9 +36,19 @@ def index():
         race.date = race.date.strftime(DATE_FORMAT)
     return render_template(
         "home.html",
-        username=current_user.name if current_user.is_authenticated else None,
+        username=current_user.username if current_user.is_authenticated else None,
         races=races,
         now=now_display,
         available_departments=FFC_CALENDAR_URLS.keys(),
         available_category_filters=CATEGORY_FILTERS,
     )
+
+@main_bp.route("/admin")
+@login_required
+def admin():
+    if current_user.role != "admin":
+        abort(403)
+    db = current_app.config["repository"]
+    users = db.list_users()
+    return render_template("admin.html", users=users)
+    

@@ -1,4 +1,5 @@
 from datetime import date
+import re
 from typing import Optional
 from dataclasses import dataclass
 from bcrypt import checkpw
@@ -90,11 +91,23 @@ class RaceFilter:
 
 
 class User(flask_login.UserMixin):
-    def __init__(self, name: str, email: str, password_hash: bytes, role: str = "user", user_id: Optional[int] = None):
+    user_id: int
+    firstname: str
+    lastname: str
+    email: str
+    username: str
+    password_hash: bytes
+    category: Category
+    role: str
+    def __init__(self, email: str, username: str, password_hash: bytes, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, user_id: Optional[int] = None):
+        self.user_id = user_id
         self.id = user_id
-        self.name = name
+        self.firstname = firstname
+        self.lastname = lastname
         self.email = email
+        self.username = username
         self.password_hash = password_hash
+        self.category = category
         if role not in ROLES.values():
             self.role = "user"  # Default to "user"
         else:

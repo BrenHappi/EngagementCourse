@@ -1,5 +1,6 @@
 import sqlite3
 from bcrypt import hashpw, gensalt
+from typing import Optional
 from datetime import datetime
 from engagement_course.config import SQLITE_DB_PATH, DATE_FORMAT
 from engagement_course.models import Category, RaceEvent, RaceFilter, User
@@ -54,16 +55,22 @@ class DatabaseRepository:
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
+                    firstname TEXT NOT NULL,
+                    lastname TEXT NOT NULL,
                     email TEXT NOT NULL UNIQUE,
+                    username TEXT NOT NULL UNIQUE,
                     password TEXT NOT NULL,
                     role TEXT NOT NULL,
+                    category_key TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
             )
 
     def replace_races(self, races: list[RaceEvent]) -> None:
@@ -205,14 +212,15 @@ class DatabaseRepository:
 
         return races_by_id.values()
 
-    def create_user(self, name: str, email: str, password: str, role: str = "user") -> int:
+    def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None) -> int:
+        category_key = f"{category.level}_{category.number}" if category is not None else None
         with self._connect() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO users (name, email, password, role)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users (email, username, password, category_key, firstname, lastname, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, email, hashpw(password.encode('utf-8'), gensalt()), role),
+                (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, firstname, lastname, role),
             )
             return int(cursor.lastrowid)
 
@@ -220,14 +228,24 @@ class DatabaseRepository:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, name, email, password, role
+                SELECT id, email, username, password, category_key, firstname, lastname, role
                 FROM users
                 ORDER BY id
                 """
             ).fetchall()
 
         return [
-            User(user_id=row["id"], name=row["name"], email=row["email"], password_hash=row["password"], role=row["role"])
+            User(
+                user_id=row["id"],
+                email=row["email"],
+                username=row["username"],
+                password_hash=row["password"],
+                category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+                firstname=row["firstname"],
+                lastname=row["lastname"],
+                role=row["role"],
+            )
+
             for row in rows
         ]
     
@@ -235,7 +253,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, name, email, password, role
+                SELECT id, email, username, password, category_key, firstname, lastname, role
                 FROM users
                 WHERE id = ?
                 """,
@@ -245,13 +263,22 @@ class DatabaseRepository:
         if row is None:
             return None
 
-        return User(user_id=row["id"], name=row["name"], email=row["email"], password_hash=row["password"], role=row["role"])
+        return User(
+            user_id=row["id"],
+            email=row["email"],
+            username=row["username"],
+            password_hash=row["password"],
+            category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            firstname=row["firstname"],
+            lastname=row["lastname"],
+            role=row["role"],
+        )
     
     def get_user_by_email(self, email: str) -> User | None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, name, email, password, role
+                SELECT id, email, username, password, category_key, firstname, lastname, role
                 FROM users
                 WHERE email = ?
                 """,
@@ -261,4 +288,38 @@ class DatabaseRepository:
         if row is None:
             return None
 
-        return User(user_id=row["id"], name=row["name"], email=row["email"], password_hash=row["password"], role=row["role"])
+        return User(
+            user_id=row["id"],
+            email=row["email"],
+            username=row["username"],
+            password_hash=row["password"],
+            category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            firstname=row["firstname"],
+            lastname=row["lastname"],
+            role=row["role"],
+        )
+    
+    def get_user_by_username(self, username: str) -> User | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, email, username, password, category_key, firstname, lastname, role
+                FROM users
+                WHERE username = ?
+                """,
+                (username,)
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return User(
+            user_id=row["id"],
+            email=row["email"],
+            username=row["username"],
+            password_hash=row["password"],
+            category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            firstname=row["firstname"],
+            lastname=row["lastname"],
+            role=row["role"],
+        )

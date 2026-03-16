@@ -16,8 +16,8 @@
   {% endwith %}
 
   <form method="post" action="{{ url_for('auth.login') }}">
-    <label for="email">Email</label>
-    <input id="email" name="email" type="email" required>
+    <label for="email">Email or username</label>
+    <input id="email_or_username" name="email_or_username" type="text" required>
 
     <label for="password">Password</label>
     <input id="password" name="password" type="password" required>

@@ -6,6 +6,7 @@
 </head>
 <body>
   <h1>Create Account</h1>
+  {% set data = form_data if form_data is defined else {} %}
 
   {% with messages = get_flashed_messages() %}
     {% if messages %}
@@ -18,11 +19,25 @@
   <form method="post" action="{{ url_for('auth.register') }}">
     <input type="hidden" name="_t" value="{{ request.args.get('t', '') }}">
 
-    <label for="name">Name</label>
-    <input id="name" name="name" type="text" required>
+    <label for="firstname">First name</label>
+    <input id="firstname" name="firstname" type="text" required value="{{ data.get('firstname', '') }}">
+
+    <label for="lastname">Last name</label>
+    <input id="lastname" name="lastname" type="text" required value="{{ data.get('lastname', '') }}">
+
+    <label for="username">Username (optional)</label>
+    <input id="username" name="username" type="text" value="{{ data.get('username', '') }}">
+
+    <label for="category">Category</label>
+    <select id="category" name="category" required>
+      <option value="" disabled {% if not data.get('category') %}selected{% endif %}>Select a category</option>
+      {% for key, label in category_options %}
+        <option value="{{ key }}" {% if data.get('category') == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
 
     <label for="email">Email</label>
-    <input id="email" name="email" type="email" required>
+    <input id="email" name="email" type="email" required value="{{ data.get('email', '') }}">
 
     <label for="password">Password</label>
     <input id="password" name="password" type="password" required>
