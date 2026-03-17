@@ -1,10 +1,28 @@
 from flask import Blueprint, flash, current_app, redirect, request, url_for, render_template, abort
 from flask_login import login_required, login_user, logout_user, current_user
+from flask_wtf import FlaskForm
+from wtforms import HiddenField, PasswordField, SelectField, StringField
+from wtforms.validators import DataRequired, Optional
 
 from engagement_course.models import Category
 from engagement_course.config import CATEGORY_FILTERS
 
 auth_bp = Blueprint('auth', __name__)
+
+
+class LoginForm(FlaskForm):
+    email_or_username = StringField(validators=[DataRequired()])
+    password = PasswordField(validators=[DataRequired()])
+
+
+class RegisterForm(FlaskForm):
+    registration_token = HiddenField(validators=[DataRequired()])
+    firstname = StringField(validators=[DataRequired()])
+    lastname = StringField(validators=[DataRequired()])
+    username = StringField(validators=[Optional()])
+    category = SelectField(validators=[DataRequired()])
+    email = StringField(validators=[DataRequired()])
+    password = PasswordField(validators=[DataRequired()])
 
 
 def _category_options() -> list[tuple[str, str]]:
@@ -23,19 +41,24 @@ def get_repo():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("main.index"))
-    
-    if request.method == 'POST':
-        email_or_username = request.form.get('email_or_username', "").strip()
-        password = request.form.get('password')
+
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        email_or_username = form.email_or_username.data.strip()
+        password = form.password.data
 
         user = get_repo().get_user_by_email(email_or_username) or get_repo().get_user_by_username(email_or_username)
         if user and user.verify_password(password):
             login_user(user)
             return redirect(url_for('main.index'))
-        
+
         flash("Email ou mot de passe incorrect")
 
-    return render_template('login.html')
+    elif request.method == 'POST':
+        flash("Veuillez remplir tous les champs obligatoires")
+
+    return render_template('login.html', form=form)
 
 @auth_bp.route('/logout')
 @login_required
@@ -46,57 +69,54 @@ def logout():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    category_options = _category_options()
+    category_options = [("", "Select a category")] + _category_options()
+    form = RegisterForm()
+    form.category.choices = category_options
 
     if request.method == "GET":
-        return render_template("register.html", category_options=category_options, form_data={})
-    
-    if request.method == "POST":
-        if not has_valid_registration_token(request):
+        form.registration_token.data = request.args.get("_t", "")
+
+    if form.validate_on_submit():
+        if not has_valid_registration_token(form.registration_token.data):
             abort(403)
-        
-        else:
-            email = (request.form.get("email") or "").strip()
-            username = (request.form.get("username") or "").strip()
-            password = request.form.get("password")
-            firstname = (request.form.get("firstname") or "").strip()
-            lastname = (request.form.get("lastname") or "").strip()
-            category_key = request.form.get("category")
-            category = Category.from_key(category_key)
 
-            form_data = {
-                "email": email,
-                "username": username or "",
-                "firstname": firstname,
-                "lastname": lastname,
-                "category": category_key or "",
-            }
+        email = (form.email.data or "").strip()
+        username = (form.username.data or "").strip()
+        password = form.password.data
+        firstname = (form.firstname.data or "").strip()
+        lastname = (form.lastname.data or "").strip()
+        category_key = form.category.data
+        category = Category.from_key(category_key)
 
-            if not firstname or not lastname or not email or not password or category is None:
-                flash("Veuillez remplir tous les champs obligatoires")
-                return render_template("register.html", category_options=category_options, form_data=form_data)
+        if category is None:
+            flash("Veuillez remplir tous les champs obligatoires")
+            return render_template("register.html", form=form)
 
-            if get_repo().get_user_by_email(email) is not None:
-                flash("Un compte avec cet email existe déjà")
-                return render_template("register.html", category_options=category_options, form_data=form_data)
-            
-            if username and get_repo().get_user_by_username(username) is not None:
-                flash("Un compte avec ce nom d'utilisateur existe déjà")
-                return render_template("register.html", category_options=category_options, form_data=form_data)
+        if get_repo().get_user_by_email(email) is not None:
+            flash("Un compte avec cet email existe déjà")
+            return render_template("register.html", form=form)
 
-            get_repo().create_user(
-                email=email,
-                username=username,
-                password=password,
-                firstname=firstname,
-                lastname=lastname,
-                category=category,
-                role="user",
-            )
-            flash("Votre compte a été créé, vous pouvez maintenant vous connecter")
-            return redirect(url_for("auth.login"))
-            
+        if username and get_repo().get_user_by_username(username) is not None:
+            flash("Un compte avec ce nom d'utilisateur existe déjà")
+            return render_template("register.html", form=form)
 
-def has_valid_registration_token(req) -> bool:
-    token = req.form.get("_t", "")
+        get_repo().create_user(
+            email=email,
+            username=username,
+            password=password,
+            firstname=firstname,
+            lastname=lastname,
+            category=category,
+            role="user",
+        )
+        flash("Votre compte a été créé, vous pouvez maintenant vous connecter")
+        return redirect(url_for("auth.login"))
+
+    if request.method == "POST":
+        flash("Veuillez remplir tous les champs obligatoires")
+
+    return render_template("register.html", form=form)
+
+
+def has_valid_registration_token(token: str) -> bool:
     return token == current_app.config["registration_token"]

@@ -3,15 +3,18 @@ from os import getenv
 from dotenv import load_dotenv
 from flask import Flask
 from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 
 from engagement_course.auth import auth_bp
 from engagement_course.routes import main_bp
+from engagement_course.admin import admin_bp
 from engagement_course.database import DatabaseRepository
 from engagement_course.ffc_parser import FFCParser
 import engagement_course.config as config
 
 load_dotenv()
 lm = LoginManager()
+csrf = CSRFProtect()
 
 
 def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
@@ -29,7 +32,8 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.secret_key = secrets.token_hex(32)
+    app.secret_key = config.SECRET_KEY
+    csrf.init_app(app)
     db = DatabaseRepository()
     app.config["repository"] = db
     app.config['registration_token'] = config.REGISTRATION_TOKEN
@@ -66,6 +70,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(admin_bp)
 
     # TMP: display registration token:
     print(f"Registration URL: {app.config['registration_token']}")

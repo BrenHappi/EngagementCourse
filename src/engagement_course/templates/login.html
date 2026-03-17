@@ -16,11 +16,13 @@
   {% endwith %}
 
   <form method="post" action="{{ url_for('auth.login') }}">
-    <label for="email">Email or username</label>
-    <input id="email_or_username" name="email_or_username" type="text" required>
+    {{ form.hidden_tag() }}
+
+    <label for="email_or_username">Email or username</label>
+    {{ form.email_or_username(id="email_or_username", type="text", required=true) }}
 
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" required>
+    {{ form.password(id="password", type="password", required=true) }}
 
     <button type="submit">Login</button>
   </form>
