@@ -18,7 +18,17 @@ def index():
     departments = [int(d) for d in raw_departments] or None
 
     raw_categories = request.args.getlist("category")
-    categories = [c for c in (Category.from_key(k) for k in raw_categories) if c] or None
+    parsed_categories = [c for c in (Category.from_key(k) for k in raw_categories) if c]
+
+    if parsed_categories:
+        categories = parsed_categories
+        selected_category_keys = [category.to_key() for category in parsed_categories]
+    elif current_user.category is not None:
+        categories = [current_user.category]
+        selected_category_keys = [current_user.category.to_key()]
+    else:
+        categories = None
+        selected_category_keys = []
 
     filters = RaceFilter(
             date_from=date_from,
@@ -41,6 +51,7 @@ def index():
         now=now_display,
         available_departments=FFC_CALENDAR_URLS.keys(),
         available_category_filters=CATEGORY_FILTERS,
+        selected_category_keys=selected_category_keys,
     )
 
 @main_bp.route("/admin")

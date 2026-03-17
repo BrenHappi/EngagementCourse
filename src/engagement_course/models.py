@@ -54,7 +54,9 @@ class Category:
         if len(parts) == 2 and parts[1].isdigit():
             return Category(level=parts[0], number=int(parts[1]))
         return None
-    
+
+    def to_key(self) -> str:
+        return f"{self.level}_{self.number}"    
 
 class RaceEvent:
     def __init__(

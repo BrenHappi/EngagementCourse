@@ -17,7 +17,7 @@
 	<section>
 		<h2>Filtres</h2>
 		{% set selected_departments = request.args.getlist('department') %}
-		{% set selected_categories = request.args.getlist('category') %}
+		{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
 		<form method="get" action="{{ url_for('main.index') }}">
 			<fieldset>
 				<legend>Département</legend>
