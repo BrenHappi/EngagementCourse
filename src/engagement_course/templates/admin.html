@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Administration</title>
+	<style>
+		body {
+			font-family: sans-serif;
+			margin: 1rem;
+			line-height: 1.4;
+		}
+
+		header,
+		section,
+		main {
+			margin-bottom: 1.5rem;
+		}
+
+		nav ul {
+			display: flex;
+			gap: 0.8rem;
+			padding: 0;
+			margin: 0;
+			list-style: none;
+			flex-wrap: wrap;
+		}
+
+		.registration-link {
+			display: flex;
+			gap: 0.5rem;
+			flex-wrap: wrap;
+			align-items: center;
+			margin: 0.5rem 0;
+		}
+
+		.registration-link input {
+			min-width: 22rem;
+			max-width: 100%;
+			width: 100%;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+		}
+
+		th,
+		td {
+			border: 1px solid #c8c8c8;
+			padding: 0.4rem;
+			vertical-align: top;
+		}
+
+		input,
+		select,
+		button {
+			font: inherit;
+		}
+
+		td input,
+		td select {
+			width: 100%;
+			min-width: 7rem;
+			box-sizing: border-box;
+		}
+
+		.actions {
+			display: flex;
+			gap: 0.4rem;
+			flex-wrap: wrap;
+		}
+
+		.copy-feedback {
+			min-height: 1.2rem;
+			margin: 0;
+		}
+	</style>
+</head>
+<body>
+	{% set create_user_url = create_user_url if create_user_url is defined else url_for('admin.admin') %}
+	{% set update_user_url = update_user_url if update_user_url is defined else url_for('admin.admin') %}
+	{% set delete_user_url = delete_user_url if delete_user_url is defined else url_for('admin.admin') %}
+
+	{% if registration_url is defined %}
+		{% set registration_link = registration_url %}
+	{% elif registration_token is defined %}
+		{% set registration_link = url_for('auth.register', _external=True, _t=registration_token) %}
+	{% else %}
+		{% set registration_link = '' %}
+	{% endif %}
+
+	<header>
+		<h1>Administration</h1>
+		<p>Gestion de la plateforme.</p>
+		<form method="get" action="{{ url_for('auth.logout') }}">
+			<button type="submit">Logout</button>
+		</form>
+	</header>
+
+	{% with messages = get_flashed_messages() %}
+		{% if messages %}
+			<section aria-label="messages">
+				{% for message in messages %}
+					<p>{{ message }}</p>
+				{% endfor %}
+			</section>
+		{% endif %}
+	{% endwith %}
+
+	<section aria-label="menu admin">
+		<h2>Menus</h2>
+		<nav>
+			<ul>
+				<li><a href="#users-panel">Gestion des utilisateurs</a></li>
+				<li><a href="#registration-panel">Inscriptions aux courses</a></li>
+				<li>Autres menus a venir</li>
+			</ul>
+		</nav>
+	</section>
+
+	<main id="users-panel">
+		<h2>Gestion des utilisateurs</h2>
+
+		<section aria-label="lien inscription">
+			<h3>Lien d'inscription</h3>
+			<div class="registration-link">
+				<label for="registration-link">URL:</label>
+				<input id="registration-link" type="text" value="{{ registration_link }}" readonly>
+				<button type="button" id="copy-registration-link">Copier</button>
+			</div>
+			<p id="copy-feedback" class="copy-feedback" aria-live="polite"></p>
+			{% if not registration_link %}
+				<p>Le lien s'affichera quand la route admin fournira <code>registration_url</code> ou <code>registration_token</code>.</p>
+			{% endif %}
+		</section>
+
+		<section aria-label="ajout utilisateur">
+			<h3>Ajouter un utilisateur</h3>
+			<form method="post" action="{{ create_user_url }}">
+				<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+				<input type="hidden" name="admin_action" value="create_user">
+
+				<label for="new-firstname">Prenom</label>
+				<input id="new-firstname" name="firstname" type="text" required>
+
+				<label for="new-lastname">Nom</label>
+				<input id="new-lastname" name="lastname" type="text" required>
+
+				<label for="new-username">Username</label>
+				<input id="new-username" name="username" type="text" required>
+
+				<label for="new-email">Email</label>
+				<input id="new-email" name="email" type="email" required>
+
+				<label for="new-password">Mot de passe</label>
+				<input id="new-password" name="password" type="password" required>
+
+				<label for="new-category">Categorie (ex: OPEN_1)</label>
+				<input id="new-category" name="category" type="text" placeholder="OPEN_1">
+
+				<label for="new-role">Role</label>
+				<select id="new-role" name="role">
+					<option value="user" selected>user</option>
+					<option value="admin">admin</option>
+				</select>
+
+				<button type="submit">Ajouter</button>
+			</form>
+		</section>
+
+		<section aria-label="table utilisateurs">
+			<h3>Utilisateurs existants</h3>
+
+			{% if users %}
+				<table>
+					<thead>
+						<tr>
+							<th>ID</th>
+							<th>Prenom</th>
+							<th>Nom</th>
+							<th>Username</th>
+							<th>Email</th>
+							<th>Categorie</th>
+							<th>Role</th>
+							<th>Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for user in users %}
+							{% set form_id = 'update-user-' ~ user.user_id %}
+							{% set category_key = (user.category.level ~ '_' ~ user.category.number) if user.category else '' %}
+							<tr>
+								<td>{{ user.user_id }}</td>
+								<td>
+									<input
+										form="{{ form_id }}"
+										name="firstname"
+										type="text"
+										value="{{ user.firstname }}"
+										required
+									>
+								</td>
+								<td>
+									<input
+										form="{{ form_id }}"
+										name="lastname"
+										type="text"
+										value="{{ user.lastname }}"
+										required
+									>
+								</td>
+								<td>
+									<input
+										form="{{ form_id }}"
+										name="username"
+										type="text"
+										value="{{ user.username }}"
+										required
+									>
+								</td>
+								<td>
+									<input
+										form="{{ form_id }}"
+										name="email"
+										type="email"
+										value="{{ user.email }}"
+										required
+									>
+								</td>
+								<td>
+									<input
+										form="{{ form_id }}"
+										name="category"
+										type="text"
+										value="{{ category_key }}"
+										placeholder="OPEN_1"
+									>
+								</td>
+								<td>
+									<select form="{{ form_id }}" name="role">
+										<option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
+										<option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
+									</select>
+								</td>
+								<td>
+									<div class="actions">
+										<form id="{{ form_id }}" method="post" action="{{ update_user_url }}">
+											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+											<input type="hidden" name="admin_action" value="update_user">
+											<input type="hidden" name="user_id" value="{{ user.user_id }}">
+										</form>
+										<button type="submit" form="{{ form_id }}">Modifier</button>
+
+										<form method="post" action="{{ delete_user_url }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
+											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+											<input type="hidden" name="admin_action" value="delete_user">
+											<input type="hidden" name="user_id" value="{{ user.user_id }}">
+											<button type="submit">Supprimer</button>
+										</form>
+									</div>
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			{% else %}
+				<p>Aucun utilisateur pour le moment.</p>
+			{% endif %}
+		</section>
+	</main>
+
+	<section id="registration-panel">
+		<h2>Inscriptions aux courses</h2>
+		<p>Section reservee pour la suite.</p>
+	</section>
+
+	<script>
+		(function () {
+			var copyButton = document.getElementById("copy-registration-link");
+			var registrationInput = document.getElementById("registration-link");
+			var feedback = document.getElementById("copy-feedback");
+
+			if (!copyButton || !registrationInput || !feedback) {
+				return;
+			}
+
+			copyButton.addEventListener("click", async function () {
+				var link = registrationInput.value;
+				if (!link) {
+					feedback.textContent = "Aucun lien disponible.";
+					return;
+				}
+
+				try {
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						await navigator.clipboard.writeText(link);
+					} else {
+						registrationInput.focus();
+						registrationInput.select();
+						document.execCommand("copy");
+					}
+					feedback.textContent = "Lien copie dans le presse-papier.";
+				} catch (error) {
+					feedback.textContent = "Copie impossible. Copiez le lien manuellement.";
+				}
+			});
+		})();
+	</script>
+</body>
+</html>

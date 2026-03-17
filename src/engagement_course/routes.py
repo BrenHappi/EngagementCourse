@@ -53,13 +53,4 @@ def index():
         available_category_filters=CATEGORY_FILTERS,
         selected_category_keys=selected_category_keys,
     )
-
-@main_bp.route("/admin")
-@login_required
-def admin():
-    if current_user.role != "admin":
-        abort(403)
-    db = current_app.config["repository"]
-    users = db.list_users()
-    return render_template("admin.html", users=users)
     

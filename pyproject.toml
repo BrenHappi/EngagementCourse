@@ -12,9 +12,10 @@ dependencies = [
     "requests>=2.28.0",
     "beautifulsoup4>=4.11.0",
     "flask>=3.0.0",
-    "python-dotenv-1.2.2",
-    "bcrypt-5.0.0",
-    "flask-login-0.6.3",
+    "python-dotenv",
+    "bcrypt",
+    "flask-login",
+    "flask-wtf>=1.2.2",
 ]
 
 [project.optional-dependencies]

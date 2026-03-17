@@ -29,6 +29,4 @@ Lorsque l'admin souhaite onboarder de nouveaux utilisateurs (par example, au dé
 - parser davantage de catégories
 
 ## To Resolve:
-
-
-
+- registration token ne fonctionne pas ;)

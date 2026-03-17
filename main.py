@@ -2,4 +2,4 @@ from engagement_course.app import create_app
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True)
+    app.run(host="localhost", port=3000, debug=True)

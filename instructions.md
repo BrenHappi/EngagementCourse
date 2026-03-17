@@ -1,7 +1,18 @@
-En gros je veux:
+Je veux créer ma page d'administration. Cette dernière aura plusieurs menu:
 
-- des filtres pour affiner les courses que l'on affiche (catégorie, mois, département)
-- une barre de recherche
-- des containers
+- 1 menu pour gerer les utilisateurs (création, modification, supression)
+- 1 menu pour gérer les inscriptions aux courses
+- autre chose plus tard ?
 
-Les containers contiendront les informations de la courses, et les coureurs qui se sont positionnés sur cette course. Lorsque l'on clique sur ce container, il faudrait faire apparaître une modale qui contiendra le détail et permettra au coureur de s'inscrire (si c'est possible facilement)
+On se focalise pour l'instant sur la partie gestion des utilisateurs. Cette dernière contiendra:
+
+- le lien d'inscription (affichage dynamique) avec un bouton pour le copier dans le presse-papier (l'admin s'en servira pour l'envoyer aux utilisateurs)
+- un tableau avec tous les utilisateurs
+
+L'administrateur devra être capable via cette interface de:
+- ajouter des nouveaux utilisateurs
+- modifier/supprimer les utilisateurs existants
+
+Fait en sorte que ça soit le plus simple possible dans un premier temps.
+
+Aucun styling/Styling minimal
