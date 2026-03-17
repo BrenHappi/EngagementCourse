@@ -84,7 +84,15 @@ def register():
                 flash("Un compte avec ce nom d'utilisateur existe déjà")
                 return render_template("register.html", category_options=category_options, form_data=form_data)
 
-            get_repo().create_user(email, username, password, category, firstname, lastname, role="user")
+            get_repo().create_user(
+                email=email,
+                username=username,
+                password=password,
+                firstname=firstname,
+                lastname=lastname,
+                category=category,
+                role="user",
+            )
             flash("Votre compte a été créé, vous pouvez maintenant vous connecter")
             return redirect(url_for("auth.login"))
             

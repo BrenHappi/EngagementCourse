@@ -17,7 +17,7 @@
   {% endwith %}
 
   <form method="post" action="{{ url_for('auth.register') }}">
-    <input type="hidden" name="_t" value="{{ request.args.get('t', '') }}">
+    <input type="hidden" name="_t" value="{{ request.args.get('_t', '') }}">
 
     <label for="firstname">First name</label>
     <input id="firstname" name="firstname" type="text" required value="{{ data.get('firstname', '') }}">
@@ -25,7 +25,7 @@
     <label for="lastname">Last name</label>
     <input id="lastname" name="lastname" type="text" required value="{{ data.get('lastname', '') }}">
 
-    <label for="username">Username (optional)</label>
+    <label for="username">Username</label>
     <input id="username" name="username" type="text" value="{{ data.get('username', '') }}">
 
     <label for="category">Category</label>
