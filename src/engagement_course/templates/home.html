@@ -9,7 +9,8 @@
 	<header>
 		<h1>Courses</h1>
 		<p>Bonjour {{ username }}</p>
-		<form method="get" action="{{ url_for('auth.logout') }}">
+		<form method="post" action="{{ url_for('auth.logout') }}">
+			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 			<button type="submit">Logout</button>
 		</form>
 	</header>

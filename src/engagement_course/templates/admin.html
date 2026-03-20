@@ -93,7 +93,8 @@
 	<header>
 		<h1>Administration</h1>
 		<p>Gestion de la plateforme.</p>
-		<form method="get" action="{{ url_for('auth.logout') }}">
+		<form method="post" action="{{ url_for('auth.logout') }}">
+			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 			<button type="submit">Logout</button>
 		</form>
 	</header>
@@ -156,8 +157,13 @@
 				<label for="new-password">Mot de passe</label>
 				<input id="new-password" name="password" type="password" required>
 
-				<label for="new-category">Categorie (ex: OPEN_1)</label>
-				<input id="new-category" name="category" type="text" placeholder="OPEN_1">
+				<label for="new-category">Categorie</label>
+				<select id="new-category" name="category">
+					<option value="" selected>Aucune</option>
+					{% for category_key, category_label in category_options %}
+						<option value="{{ category_key }}">{{ category_label }}</option>
+					{% endfor %}
+				</select>
 
 				<label for="new-role">Role</label>
 				<select id="new-role" name="role">
