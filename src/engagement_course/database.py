@@ -11,11 +11,13 @@ class DatabaseRepository:
         self.db_path = db_path
         self._init_database()
 
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
 
     def _init_database(self) -> None:
         with self._connect() as conn:
@@ -73,6 +75,7 @@ class DatabaseRepository:
                 "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
             )
 
+
     def replace_races(self, races: list[RaceEvent]) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM races")
@@ -110,12 +113,15 @@ class DatabaseRepository:
                         category_records,
                     )
 
+
     def list_races(self) -> list[RaceEvent]:
         return self.search_races()
-    
+
+
     def list_races_by_category(self, category: Category) -> list[RaceEvent]:
         filters = RaceFilter(category=[category])
         return self.search_races(filters)
+
 
     def search_races(self, filters: RaceFilter | None = None) -> list[RaceEvent]:
         f = filters or RaceFilter()
@@ -212,6 +218,7 @@ class DatabaseRepository:
 
         return races_by_id.values()
 
+
     def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None) -> int:
         category_key = f"{category.level}_{category.number}" if category is not None else None
         with self._connect() as conn:
@@ -223,6 +230,43 @@ class DatabaseRepository:
                 (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, firstname, lastname, role),
             )
             return int(cursor.lastrowid)
+        
+
+    def update_user(self, user_id: int, email: Optional[str]=None, username: Optional[str]=None, password: Optional[str]=None, firstname: Optional[str]=None, lastname: Optional[str]=None, role: Optional[str]=None, category: Optional[Category]=None) -> None:
+        category_key = f"{category.level}_{category.number}" if category is not None else None
+        with self._connect() as conn:
+            user = self.get_user_by_id(user_id)
+            if user is None:
+                raise ValueError("User not found")
+
+            updated_email = email if email is not None else user.email
+            updated_username = username if username is not None else user.username
+            updated_password_hash = hashpw(password.encode('utf-8'), gensalt()) if password is not None else user.password_hash
+            updated_firstname = firstname if firstname is not None else user.firstname
+            updated_lastname = lastname if lastname is not None else user.lastname
+            updated_role = role if role is not None else user.role
+            updated_category_key = category_key if category_key is not None else (user.category.to_key() if user.category else None)
+
+            conn.execute(
+                """
+                UPDATE users
+                SET email = ?, username = ?, password = ?, category_key = ?, firstname = ?, lastname = ?, role = ?
+                WHERE id = ?
+                """,
+                (updated_email, updated_username, updated_password_hash, updated_category_key, updated_firstname, updated_lastname, updated_role, user_id),
+            )
+
+
+    def delete_user(self, user_id: int) -> None:
+        with self._connect() as conn:
+            user = self.get_user_by_id(user_id)
+            if user is None:
+                raise ValueError("User not found")
+            conn.execute(
+                "DELETE FROM users WHERE id = ?",
+                (user_id,)
+            )
+
 
     def list_users(self) -> list[User]:
         with self._connect() as conn:
@@ -249,6 +293,7 @@ class DatabaseRepository:
             for row in rows
         ]
     
+
     def get_user_by_id(self, id: int) -> User | None:
         with self._connect() as conn:
             row = conn.execute(
@@ -274,6 +319,7 @@ class DatabaseRepository:
             role=row["role"],
         )
     
+
     def get_user_by_email(self, email: str) -> User | None:
         with self._connect() as conn:
             row = conn.execute(
@@ -299,6 +345,7 @@ class DatabaseRepository:
             role=row["role"],
         )
     
+
     def get_user_by_username(self, username: str) -> User | None:
         with self._connect() as conn:
             row = conn.execute(

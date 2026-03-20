@@ -140,7 +140,7 @@
 			<h3>Ajouter un utilisateur</h3>
 			<form method="post" action="{{ create_user_url }}">
 				<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-				<input type="hidden" name="admin_action" value="create_user">
+				<input type="hidden" name="_action" value="create_user">
 
 				<label for="new-firstname">Prenom</label>
 				<input id="new-firstname" name="firstname" type="text" required>
@@ -149,7 +149,7 @@
 				<input id="new-lastname" name="lastname" type="text" required>
 
 				<label for="new-username">Username</label>
-				<input id="new-username" name="username" type="text" required>
+				<input id="new-username" name="username" type="text">
 
 				<label for="new-email">Email</label>
 				<input id="new-email" name="email" type="email" required>
@@ -160,8 +160,10 @@
 				<label for="new-category">Categorie</label>
 				<select id="new-category" name="category">
 					<option value="" selected>Aucune</option>
-					{% for category_key, category_label in category_options %}
-						<option value="{{ category_key }}">{{ category_label }}</option>
+					{% for level, numbers in available_category_filters.items() %}
+						{% for number in numbers %}
+							<option value="{{ level }}_{{ number }}">{{ level }} {{ number }}</option>
+						{% endfor %}
 					{% endfor %}
 				</select>
 
@@ -235,13 +237,15 @@
 									>
 								</td>
 								<td>
-									<input
-										form="{{ form_id }}"
-										name="category"
-										type="text"
-										value="{{ category_key }}"
-										placeholder="OPEN_1"
-									>
+									<select form="{{ form_id }}" name="category">
+										<option value="" {% if not category_key %}selected{% endif %}>Aucune</option>
+										{% for level, numbers in available_category_filters.items() %}
+											{% for number in numbers %}
+												{% set option_key = level ~ '_' ~ number %}
+												<option value="{{ option_key }}" {% if option_key == category_key %}selected{% endif %}>{{ level }} {{ number }}</option>
+											{% endfor %}
+										{% endfor %}
+									</select>
 								</td>
 								<td>
 									<select form="{{ form_id }}" name="role">
@@ -253,14 +257,14 @@
 									<div class="actions">
 										<form id="{{ form_id }}" method="post" action="{{ update_user_url }}">
 											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-											<input type="hidden" name="admin_action" value="update_user">
+											<input type="hidden" name="_action" value="update_user">
 											<input type="hidden" name="user_id" value="{{ user.user_id }}">
 										</form>
 										<button type="submit" form="{{ form_id }}">Modifier</button>
 
 										<form method="post" action="{{ delete_user_url }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
 											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-											<input type="hidden" name="admin_action" value="delete_user">
+											<input type="hidden" name="_action" value="delete_user">
 											<input type="hidden" name="user_id" value="{{ user.user_id }}">
 											<button type="submit">Supprimer</button>
 										</form>
