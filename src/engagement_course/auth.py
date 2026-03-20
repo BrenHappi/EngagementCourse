@@ -5,7 +5,6 @@ from wtforms import HiddenField, PasswordField, SelectField, StringField
 from wtforms.validators import DataRequired, Optional
 
 from engagement_course.models import Category
-from engagement_course.config import CATEGORY_FILTERS
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -23,15 +22,6 @@ class RegisterForm(FlaskForm):
     category = SelectField(validators=[DataRequired()])
     email = StringField(validators=[DataRequired()])
     password = PasswordField(validators=[DataRequired()])
-
-
-def _category_options() -> list[tuple[str, str]]:
-    options: list[tuple[str, str]] = []
-    for level, numbers in CATEGORY_FILTERS.items():
-        for number in numbers:
-            key = f"{level}_{number}"
-            options.append((key, f"{level} {number}"))
-    return options
 
 
 def get_repo():
@@ -69,7 +59,7 @@ def logout():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    category_options = [("", "Select a category")] + _category_options()
+    category_options = [("", "Select a category")] + Category.get_category_options()
     form = RegisterForm()
     form.category.choices = category_options
 

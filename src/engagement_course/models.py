@@ -56,10 +56,33 @@ class Category:
 
     @staticmethod
     def from_key(key: str) -> "Category | None":
+        """
+        Converts a category key (e.g., "OPEN_1") into a Category object.
+        Args:
+            key: The category key string. (e.g., "OPEN_1")
+        Returns:
+            A Category object or None if the key is invalid. 
+            e.g., "OPEN_1" -> Category(level="OPEN", number=1)
+        """
         parts = key.split("_", 1)
         if len(parts) == 2 and parts[1].isdigit():
             return Category(level=parts[0], number=int(parts[1]))
         return None
+    
+    @staticmethod
+    def get_category_options() -> list[tuple[str, str]]:
+        """
+        Generates a list of category options for form selection.
+        Returns:
+            A list of tuples where each tuple contains a category key and its display name.
+            e.g., [("OPEN_1", "OPEN 1"), ("ACCESS_2", "ACCESS 2"), ...]
+        """
+        options: list[tuple[str, str]] = []
+        for level, numbers in CATEGORIES.items():
+            for number in numbers:
+                key = f"{level}_{number}"
+                options.append((key, f"{level} {number}"))
+        return options
 
     def to_key(self) -> str:
         return f"{self.level}_{self.number}"    
