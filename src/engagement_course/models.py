@@ -3,12 +3,17 @@ import re
 from typing import Optional
 from dataclasses import dataclass
 from bcrypt import checkpw
-from engagement_course.config import CATEGORY_FILTERS
 import flask_login
 
 ROLES = {
     1: "admin",
     2: "user"
+}
+
+# Supported categories
+CATEGORIES = {
+    "OPEN": [1, 2, 3],
+    "ACCESS": [1, 2, 3, 4],
 }
 
 class Category:
@@ -32,12 +37,13 @@ class Category:
         if raw_category is None:
             return None
         
-        # Match tout ce qui est entre parenthèses
+        # Remove the parenthetical part if it exists (e.g., "(Féminines)" in "OPEN 1,2,3 + ACCESS 1 ET 2 (Féminines)")
         pattern = r"(\([^\)]+\)?)"
         match = re.search(pattern, raw_category)
         if match:
-            raw_category = raw_category.replace(match.group(0), "").strip()  # Remove the parenthetical part
-        category_labels = CATEGORY_FILTERS.keys()
+            raw_category = raw_category.replace(match.group(0), "").strip()
+
+        category_labels = CATEGORIES.keys()
         categories = []
         for part in raw_category.split('+'):
             level = next((label for label in category_labels if label in part), None)

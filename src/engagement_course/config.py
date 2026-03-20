@@ -18,8 +18,8 @@ REGISTRATION_TOKEN = secrets.token_hex(16)  # V2 -> uses something that can be r
 
 DATE_FORMAT = "%d/%m/%Y"
 
-# Available category filters for the search form.
-CATEGORY_FILTERS = {
-    "OPEN": [1, 2, 3],
-    "ACCESS": [1, 2, 3, 4],
-}
+# # Available category filters for the search form.
+# CATEGORY_FILTERS = {
+#     "OPEN": [1, 2, 3],
+#     "ACCESS": [1, 2, 3, 4],
+# }

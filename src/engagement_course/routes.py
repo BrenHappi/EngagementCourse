@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, current_app, request, abort
 from flask_login import current_user, login_required
 from datetime import datetime
-from engagement_course.models import RaceFilter, Category
-from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT, CATEGORY_FILTERS
+from engagement_course.models import RaceFilter, Category, CATEGORIES
+from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
 
 main_bp = Blueprint("main", __name__)
 
@@ -50,7 +50,7 @@ def index():
         races=races,
         now=now_display,
         available_departments=FFC_CALENDAR_URLS.keys(),
-        available_category_filters=CATEGORY_FILTERS,
+        available_category_filters=CATEGORIES,
         selected_category_keys=selected_category_keys,
     )
     
