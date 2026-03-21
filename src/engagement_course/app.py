@@ -31,7 +31,7 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
     return len(races)
 
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder="assets")
     app.secret_key = config.SECRET_KEY
     csrf.init_app(app)
     db = DatabaseRepository()

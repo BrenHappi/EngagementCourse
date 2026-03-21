@@ -1,30 +1,54 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <title>Login</title>
-</head>
-<body>
-  <h1>Login</h1>
+{% extends "base.html" %}
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for message in messages %}
-        <p>{{ message }}</p>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+{% block title %}Connexion | Engagement Course{% endblock %}
 
-  <form method="post" action="{{ url_for('auth.login') }}">
-    {{ form.hidden_tag() }}
+{% block content %}
+  <section class="auth-wrap">
+    <div class="auth-panel">
+      <div class="auth-grid">
+        <div class="auth-aside">
+          <div class="aside-mark">
+            <img class="auth-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
+          </div>
+          <p class="eyebrow">Connexion</p>
+          <h1>ASPTT</h1>
+          <p class="hero-copy">Accès membre.</p>
+          <div class="split-line"></div>
+          <div class="tag-list" aria-label="palette club">
+            <span class="tag">Noir</span>
+            <span class="tag">Bleu nuit</span>
+            <span class="tag tag-accent">Bleu ciel</span>
+          </div>
+        </div>
+        <div class="auth-form">
+          <div>
+            <h2>Se connecter</h2>
+          </div>
 
-    <label for="email_or_username">Email or username</label>
-    {{ form.email_or_username(id="email_or_username", type="text", required=true) }}
+          <form method="post" action="{{ url_for('auth.login') }}">
+            {{ form.hidden_tag() }}
 
-    <label for="password">Password</label>
-    {{ form.password(id="password", type="password", required=true) }}
+            <div class="field-block full">
+              <label for="email_or_username">Email ou nom d'utilisateur</label>
+              {{ form.email_or_username(id="email_or_username", type="text", required=true, placeholder="Email ou username") }}
+            </div>
 
-    <button type="submit">Login</button>
-  </form>
-</body>
-</html>
+            <div class="field-block full">
+              <label for="password">Mot de passe</label>
+              {{ form.password(id="password", type="password", required=true, placeholder="Mot de passe") }}
+            </div>
+
+            <div class="form-actions">
+              <button type="submit">Connexion</button>
+            </div>
+          </form>
+
+          <div class="auth-links">
+            <span class="muted">Nouveau membre</span>
+            <a class="pill-link" href="{{ url_for('auth.register') }}">Créer un compte</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

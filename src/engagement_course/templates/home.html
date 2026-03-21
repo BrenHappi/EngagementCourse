@@ -1,111 +1,191 @@
-<!doctype html>
-<html lang="fr">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Engagement Course - V1</title>
-</head>
-<body>
-	<header>
-		<h1>Courses</h1>
-		<p>Bonjour {{ username }}</p>
-		<form method="post" action="{{ url_for('auth.logout') }}">
-			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-			<button type="submit">Logout</button>
-		</form>
-	</header>
+{% extends "base.html" %}
 
-	<section>
-		<h2>Filtres</h2>
-		{% set selected_departments = request.args.getlist('department') %}
-		{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
-		<form method="get" action="{{ url_for('main.index') }}">
-			<fieldset>
-				<legend>Département</legend>
-				{% for dept in available_departments %}
-					<label>
-						<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}>
-						{{ dept }}
-					</label>
-				{% endfor %}
-			</fieldset>
+{% block title %}Courses | Engagement Course{% endblock %}
 
-			<fieldset>
-				<legend>Catégorie</legend>
-				{% for level, numbers in available_category_filters.items() %}
-					{% for num in numbers %}
-						{% set key = level ~ '_' ~ num %}
-						<label>
-							<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
-							{{ level }} {{ num }}
-						</label>
-					{% endfor %}
-				{% endfor %}
-			</fieldset>
-
-			<label for="date_from">Du</label>
-			<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ request.args.get('date_from', '') }}">
-
-			<label for="date_to">Au</label>
-			<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ request.args.get('date_to', '') }}">
-
-			<button type="submit">Appliquer</button>
-		</form>
+{% block content %}
+	{% set selected_departments = request.args.getlist('department') %}
+	{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
+	{% set hero_group_photo = 'groupe_large.jpg' %}
+	{% if selected_categories %}
+		{% if 'ACCESS_1' in selected_categories or 'ACCESS_2' in selected_categories %}
+			{% set hero_group_photo = 'groupe_A1_A2.jpg' %}
+		{% elif 'ACCESS_3' in selected_categories or 'ACCESS_4' in selected_categories %}
+			{% set hero_group_photo = 'groupe_A3_A4.jpg' %}
+		{% endif %}
+	{% endif %}
+	<section class="hero">
+		<div class="hero-grid">
+			<div>
+				<p class="eyebrow">Courses</p>
+				<h1>Calendrier route</h1>
+				<p class="hero-copy">{{ username }}</p>
+				<div class="stats-grid">
+					<div class="stat-card">
+						<div class="stat-label">Courses visibles</div>
+						<div class="stat-value">{{ races|length }}</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-label">Catégories actives</div>
+						<div class="stat-value">{{ selected_categories|length }}</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-label">Date de depart</div>
+						<div class="stat-value">{{ request.args.get('date_from', now) }}</div>
+					</div>
+				</div>
+			</div>
+			<div class="hero-brand">
+				<img class="hero-brand-photo" src="{{ url_for('static', filename=hero_group_photo) }}" alt="Photo de groupe du club">
+				<img class="hero-brand-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
+				<img class="hero-brand-hermine" src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
+				<div class="hero-brand-content">
+					<p class="eyebrow">ASPTT Bretagne</p>
+					<p class="hero-brand-title">Route</p>
+					<div class="hero-brand-meta metric-inline">
+						<span class="chip">{{ available_departments|length }} dep.</span>
+						<span class="chip">{{ races|length }} courses</span>
+						<span class="chip">Photo groupe</span>
+					</div>
+				</div>
+			</div>
+		</div>
 	</section>
 
-	<main>
-		<h2>Liste des courses</h2>
-		{% if races %}
-			<ul>
-				{% for race in races %}
-					<li>
-						<button type="button" class="race-card" data-modal-id="race-modal-{{ loop.index0 }}">
-							{{ race.race_day }} {{ race.date }} - {{ race.location }} ({{ race.department }})
-						</button>
+	<div class="content-grid">
+		<aside class="panel panel-stack panel-sticky">
+			<div>
+				<p class="eyebrow">Filtres</p>
+				<h2>Filtres</h2>
+			</div>
 
-						<div>Federation: {{ race.federation }}</div>
-						<div>Type: {{ race.type }}</div>
-						<div>
-							Categories:
-							{% if race.categories %}
-								{% for category in race.categories %}
-									{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
-								{% endfor %}
-							{% else %}
-								aucune
-							{% endif %}
-						</div>
-						<div>Coureurs: non implemente V1</div>
-					</li>
-				{% endfor %}
-			</ul>
-		{% else %}
-			<p>Aucune course trouvee.</p>
-		{% endif %}
-	</main>
+			<form method="get" action="{{ url_for('main.index') }}" class="panel-stack">
+				<fieldset class="field-block full">
+					<legend>Departement</legend>
+					<div class="checkbox-grid">
+						{% for dept in available_departments %}
+							<label class="checkbox-pill">
+								<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}>
+								<span>{{ dept }}</span>
+							</label>
+						{% endfor %}
+					</div>
+				</fieldset>
+
+				<fieldset class="field-block full">
+					<legend>Catégorie</legend>
+					<div class="checkbox-grid">
+						{% for level, numbers in available_category_filters.items() %}
+							{% for num in numbers %}
+								{% set key = level ~ '_' ~ num %}
+								<label class="checkbox-pill">
+									<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
+									<span>{{ level }} {{ num }}</span>
+								</label>
+							{% endfor %}
+						{% endfor %}
+					</div>
+				</fieldset>
+
+				<div class="field-grid">
+					<div class="field">
+						<label for="date_from">Du</label>
+						<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ request.args.get('date_from', '') }}">
+					</div>
+					<div class="field">
+						<label for="date_to">Au</label>
+						<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ request.args.get('date_to', '') }}">
+					</div>
+				</div>
+
+				<div class="form-actions">
+					<button type="submit">Appliquer</button>
+					<a class="button button-ghost" href="{{ url_for('main.index') }}">Réinitialiser</a>
+				</div>
+			</form>
+		</aside>
+
+		<section class="panel panel-stack">
+			<div class="panel-title-row">
+				<div>
+					<p class="eyebrow">Résultats</p>
+					<h2>Liste des courses</h2>
+				</div>
+				<div class="chip-row">
+					<span class="chip">{{ races|length }} résultat{% if races|length > 1 %}s{% endif %}</span>
+					{% if selected_categories %}
+						<span class="chip">{{ selected_categories|join(', ') }}</span>
+					{% endif %}
+				</div>
+			</div>
+
+			{% if races %}
+				<ul class="race-grid">
+					{% for race in races %}
+						<li class="race-item">
+							<button type="button" class="race-card" data-modal-id="race-modal-{{ loop.index0 }}">
+								<div class="race-headline">
+									<div>
+										<p class="race-title">{{ race.location }}</p>
+										<p class="race-subtitle">{{ race.race_day }} {{ race.date }} • {{ race.department }}</p>
+									</div>
+									<span class="tag tag-accent">{{ race.type }}</span>
+								</div>
+								<div class="race-meta">
+									<div>{{ race.race_day }} {{ race.date }} • {{ race.department }} • {{ race.federation }}</div>
+									<div>
+										Catégories:
+										{% if race.categories %}
+											{% for category in race.categories %}
+												{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
+											{% endfor %}
+										{% else %}
+											aucune
+										{% endif %}
+									</div>
+								</div>
+							</button>
+						</li>
+					{% endfor %}
+				</ul>
+			{% else %}
+				<div class="empty-state">Aucune course ne correspond aux filtres actuels.</div>
+			{% endif %}
+		</section>
+	</div>
 
 	{% for race in races %}
 		<dialog id="race-modal-{{ loop.index0 }}">
-			<article>
-				<h3>{{ race.race_day }} {{ race.date }} - {{ race.location }} ({{ race.department }})</h3>
-				<p>Federation: {{ race.federation }}</p>
-				<p>Type: {{ race.type }}</p>
-				<p>
-					Categories:
-					{% if race.categories %}
-						{% for category in race.categories %}
-							{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
-						{% endfor %}
-					{% else %}
-						aucune
-					{% endif %}
-				</p>
-				<p>Inscription non implementee en V1.</p>
-				<button type="button" class="close-modal">Fermer</button>
+			<article class="modal-card">
+				<div class="modal-body panel-stack">
+					<div>
+						<p class="eyebrow">Course</p>
+						<h3>{{ race.location }}</h3>
+						<p class="muted">{{ race.race_day }} {{ race.date }} • Departement {{ race.department }}</p>
+					</div>
+					<div class="tag-list">
+						<span class="tag">{{ race.federation }}</span>
+						<span class="tag tag-accent">{{ race.type }}</span>
+					</div>
+					<p>
+						Catégories:
+						{% if race.categories %}
+							{% for category in race.categories %}
+								{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
+							{% endfor %}
+						{% else %}
+							aucune
+						{% endif %}
+					</p>
+					<div class="form-actions">
+						<button type="button" class="button-secondary close-modal">Fermer</button>
+					</div>
+				</div>
 			</article>
 		</dialog>
 	{% endfor %}
+{% endblock %}
 
+{% block scripts %}
 	<script>
 		(function () {
 			function openDialog(dialog) {
@@ -135,8 +215,7 @@
 			document.querySelectorAll(".race-card").forEach(function (card) {
 				card.addEventListener("click", function () {
 					var modalId = card.getAttribute("data-modal-id");
-					var modal = document.getElementById(modalId);
-					openDialog(modal);
+					openDialog(document.getElementById(modalId));
 				});
 			});
 
@@ -162,5 +241,4 @@
 			});
 		})();
 	</script>
-</body>
-</html>
+{% endblock %}

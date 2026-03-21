@@ -107,7 +107,7 @@ def admin():
                     if db.get_user_by_username(username) and db.get_user_by_username(username).id != user_id:
                         flash("Un utilisateur avec ce nom d'utilisateur existe déjà")
                         return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
-                    if role.lower() not in ["user", "admin"]:
+                    if role not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
 
                     db.update_user(

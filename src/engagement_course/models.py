@@ -64,6 +64,8 @@ class Category:
             A Category object or None if the key is invalid. 
             e.g., "OPEN_1" -> Category(level="OPEN", number=1)
         """
+        if key is None:
+            return None
         parts = key.split("_", 1)
         if len(parts) == 2 and parts[1].isdigit():
             return Category(level=parts[0], number=int(parts[1]))

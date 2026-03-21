@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>{% block title %}Engagement Course{% endblock %}</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+	{% block head %}{% endblock %}
+</head>
+<body class="{{ body_class | default('') }}">
+	<div class="site-shell">
+		<header class="topbar">
+			<a class="brand" href="{{ url_for('main.index') if current_user.is_authenticated else url_for('auth.login') }}">
+				<span class="brand-lockup">
+					<span class="brand-mark">
+						<img src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
+						<img src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
+					</span>
+					<span class="brand-copy">
+						<p class="brand-kicker">ASPTT</p>
+						<p class="brand-title">Gestion des Engagements</p>
+						<p class="brand-subtitle">Courses route</p>
+					</span>
+				</span>
+			</a>
+
+			<div class="topbar-actions">
+				{% if current_user.is_authenticated %}
+					<nav class="topbar-nav" aria-label="navigation principale">
+						<a class="pill-link" href="{{ url_for('main.index') }}">Courses</a>
+						{% if current_user.role == 'admin' %}
+							<a class="pill-link" href="{{ url_for('admin.admin') }}">Administration</a>
+						{% endif %}
+					</nav>
+					<form method="post" action="{{ url_for('auth.logout') }}">
+						<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+						<button class="button-secondary icon-btn icon-toolbar" type="submit" aria-label="Déconnexion" title="Déconnexion">
+							<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+								<path d="M14 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+								<path d="M10 12h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+								<path d="m18 8 4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+							</svg>
+						</button>
+					</form>
+				{% else %}
+					<nav class="topbar-nav" aria-label="navigation publique">
+						<a class="pill-link" href="{{ url_for('auth.login') }}">Connexion</a>
+						<a class="pill-link" href="{{ url_for('auth.register') }}">Inscription</a>
+					</nav>
+				{% endif %}
+			</div>
+		</header>
+
+		{% with messages = get_flashed_messages() %}
+			{% if messages %}
+				<ul class="message-list" aria-label="messages">
+					{% for message in messages %}
+						<li>{{ message }}</li>
+					{% endfor %}
+				</ul>
+			{% endif %}
+		{% endwith %}
+
+		<main class="page-main">
+			{% block content %}{% endblock %}
+		</main>
+	</div>
+
+	<button id="to-top" class="button-secondary icon-btn icon-toolbar to-top" type="button" aria-label="Remonter en haut" title="Remonter en haut">
+		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+			<path d="m6 14 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+		</svg>
+	</button>
+
+	<script>
+		(function () {
+			var toTopButton = document.getElementById("to-top");
+			if (!toTopButton) {
+				return;
+			}
+
+			function updateToTopVisibility() {
+				if (window.scrollY > 420) {
+					toTopButton.classList.add("is-visible");
+				} else {
+					toTopButton.classList.remove("is-visible");
+				}
+			}
+
+			toTopButton.addEventListener("click", function () {
+				window.scrollTo({ top: 0, behavior: "smooth" });
+			});
+
+			window.addEventListener("scroll", updateToTopVisibility, { passive: true });
+			updateToTopVisibility();
+		})();
+	</script>
+
+	{% block scripts %}{% endblock %}
+</body>
+</html>
