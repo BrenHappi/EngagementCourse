@@ -3,297 +3,41 @@
 {% block title %}Administration | Engagement Course{% endblock %}
 
 {% block content %}
-	{% set create_user_url = create_user_url if create_user_url is defined else url_for('admin.admin') %}
-	{% set update_user_url = update_user_url if update_user_url is defined else url_for('admin.admin') %}
-	{% set delete_user_url = delete_user_url if delete_user_url is defined else url_for('admin.admin') %}
-
-	{% if registration_url is defined %}
-		{% set registration_link = registration_url %}
-	{% elif registration_token is defined %}
-		{% set registration_link = url_for('auth.register', _external=True, _t=registration_token) %}
-	{% else %}
-		{% set registration_link = '' %}
-	{% endif %}
-
-	<section class="hero hero-compact">
-		<div class="hero-grid">
+	<section class="panel admin-home-panel">
+		<div class="admin-home-header">
 			<div>
 				<p class="eyebrow">Administration</p>
-				<h1>Utilisateurs</h1>
-				<div class="tag-list">
-					<span class="tag tag-accent">Creation</span>
-					<span class="tag">Mise a jour</span>
-					<span class="tag">Suppression</span>
-				</div>
+				<h1>Choisir une interface</h1>
+				<p class="hero-copy">Deux espaces, deux actions. Entree directe.</p>
 			</div>
-			<div class="hero-brand">
-				<img class="hero-brand-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-				<img class="hero-brand-hermine" src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
-				<div class="hero-brand-content">
-					<p class="eyebrow">Zone admin</p>
-					<p class="hero-brand-title">{{ users|length }} comptes</p>
-					<div class="tag-list">
-						<span class="tag tag-accent">Utilisateurs</span>
-						<span class="tag">Inscriptions</span>
-					</div>
-				</div>
+			<div class="chip-row">
+				<span class="chip">{{ user_count }} utilisateurs</span>
+				<span class="chip">{{ status_counts['pending'] }} demandes en attente</span>
 			</div>
 		</div>
-	</section>
 
-	<section class="panel panel-stack">
-		<div>
-			<p class="eyebrow">Inscription</p>
-			<h2>Lien d'inscription</h2>
-		</div>
-		<div class="registration-link-row">
-			<input id="registration-link" type="text" value="{{ registration_link }}" readonly>
-			<button class="button-secondary icon-btn icon-toolbar" type="button" id="copy-registration-link" aria-label="Copier le lien" title="Copier le lien">
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					<rect x="9" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-					<rect x="3" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-				</svg>
-			</button>
-		</div>
-		<p id="copy-feedback" class="copy-feedback" aria-live="polite"></p>
-		{% if not registration_link %}
-			<div class="empty-state">Le lien s'affichera ici quand la route admin fournira registration_url ou registration_token.</div>
-		{% endif %}
-	</section>
+		{% set active_admin_section = 'home' %}
+		{% include "partials/admin_nav.html" %}
 
-	<section class="table-shell" aria-label="table utilisateurs">
-			<div class="panel-title-row" style="padding: 1.4rem 1.4rem 0;">
-				<div>
-					<p class="eyebrow">Comptes</p>
-					<h2>Utilisateurs existants</h2>
+		<div class="admin-entry-grid" aria-label="choix d'interface admin">
+			<a class="admin-entry-card" href="{{ url_for('admin.manage_users') }}">
+				<p class="eyebrow">Gestion</p>
+				<h2>Utilisateurs</h2>
+				<p class="hero-copy">Comptes, roles, categories et lien d'inscription.</p>
+				<div class="admin-entry-meta">
+					<span class="chip">{{ user_count }} comptes</span>
 				</div>
-				<span class="chip">{{ users|length }} utilisateur{% if users|length > 1 %}s{% endif %}</span>
-			</div>
+			</a>
 
-			{% if users %}
-				<div class="table-scroll">
-					<table class="admin-users-table">
-						<thead>
-							<tr>
-								<th>ID</th>
-								<th>Prénom</th>
-								<th>Nom</th>
-								<th>Username</th>
-								<th>Email</th>
-								<th>Catégorie</th>
-								<th>Role</th>
-								<th>Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{% for user in users %}
-								{% set form_id = 'update-user-' ~ user.user_id %}
-								{% set category_key = (user.category.level ~ '_' ~ user.category.number) if user.category else '' %}
-								<tr class="user-row" data-form-id="{{ form_id }}">
-									<td>{{ user.user_id }}</td>
-									<td>
-										<span class="cell-text js-display">{{ user.firstname }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="firstname" type="text" value="{{ user.firstname }}" disabled hidden>
-									</td>
-									<td>
-										<span class="cell-text js-display">{{ user.lastname }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="lastname" type="text" value="{{ user.lastname }}" disabled hidden>
-									</td>
-									<td>
-										<span class="cell-text js-display">{{ user.username }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="username" type="text" value="{{ user.username }}" disabled hidden>
-									</td>
-									<td>
-										<span class="cell-text js-display">{{ user.email }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="email" type="email" value="{{ user.email }}" disabled hidden>
-									</td>
-									<td>
-										<span class="cell-text js-display">{{ category_key if category_key else 'Aucune' }}</span>
-										<select class="js-editor js-editable" form="{{ form_id }}" name="category" disabled hidden>
-											<option value="" {% if not category_key %}selected{% endif %}>Aucune</option>
-											{% for level, numbers in available_category_filters.items() %}
-												{% for number in numbers %}
-													{% set option_key = level ~ '_' ~ number %}
-													<option value="{{ option_key }}" {% if option_key == category_key %}selected{% endif %}>{{ level }} {{ number }}</option>
-												{% endfor %}
-											{% endfor %}
-										</select>
-									</td>
-									<td>
-										<span class="cell-text js-display">{{ user.role }}</span>
-										<select class="js-editor js-editable" form="{{ form_id }}" name="role" disabled hidden>
-											<option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
-											<option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
-										</select>
-									</td>
-									<td>
-										<div class="actions compact-actions">
-											<form id="{{ form_id }}" method="post" action="{{ update_user_url }}">
-												<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-												<input type="hidden" name="_action" value="update_user">
-												<input type="hidden" name="user_id" value="{{ user.user_id }}">
-											</form>
-											<button class="icon-btn icon-edit js-edit-row js-view-action" type="button" aria-label="Modifier" title="Modifier">
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-													<path d="M14.06 6.19 17.81 9.94" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-												</svg>
-											</button>
-											<button class="icon-btn icon-confirm js-save-row js-edit-action" type="submit" form="{{ form_id }}" aria-label="Valider" title="Valider" hidden>
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
-												</svg>
-											</button>
-											<button class="icon-btn js-cancel-row js-edit-action" type="button" aria-label="Annuler" title="Annuler" hidden>
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
-													<path d="m6 6 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
-												</svg>
-											</button>
-
-											<form class="js-view-action" method="post" action="{{ delete_user_url }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
-												<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-												<input type="hidden" name="_action" value="delete_user">
-												<input type="hidden" name="user_id" value="{{ user.user_id }}">
-												<button class="icon-btn icon-danger" type="submit" aria-label="Supprimer" title="Supprimer">
-													<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-														<path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-														<path d="M8 6V4h8v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-														<path d="M19 6v14H5V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-														<path d="M10 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-														<path d="M14 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-													</svg>
-												</button>
-											</form>
-										</div>
-									</td>
-								</tr>
-							{% endfor %}
-						</tbody>
-						<tfoot>
-							<tr class="create-row">
-								<td>+</td>
-								<td><input form="create-user-inline" name="firstname" type="text" required placeholder="Prénom"></td>
-								<td><input form="create-user-inline" name="lastname" type="text" required placeholder="Nom"></td>
-								<td><input form="create-user-inline" name="username" type="text" placeholder="auto"></td>
-								<td><input form="create-user-inline" name="email" type="email" required placeholder="email"></td>
-								<td>
-									<select form="create-user-inline" name="category">
-										<option value="" selected>Aucune</option>
-										{% for level, numbers in available_category_filters.items() %}
-											{% for number in numbers %}
-												<option value="{{ level }}_{{ number }}">{{ level }} {{ number }}</option>
-											{% endfor %}
-										{% endfor %}
-									</select>
-								</td>
-								<td>
-									<select form="create-user-inline" name="role">
-										<option value="user" selected>user</option>
-										<option value="admin">admin</option>
-									</select>
-								</td>
-								<td class="compact-actions">
-									<input form="create-user-inline" name="password" type="password" required placeholder="mot de passe">
-									<button class="icon-btn icon-confirm" type="submit" form="create-user-inline" aria-label="Ajouter" title="Ajouter">＋</button>
-								</td>
-							</tr>
-						</tfoot>
-					</table>
-					<form id="create-user-inline" method="post" action="{{ create_user_url }}">
-						<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-						<input type="hidden" name="_action" value="create_user">
-					</form>
+			<a class="admin-entry-card" href="{{ url_for('admin.manage_engagements') }}">
+				<p class="eyebrow">Validation</p>
+				<h2>Courses</h2>
+				<p class="hero-copy">Demandes en attente, validations et rejets.</p>
+				<div class="admin-entry-meta">
+					<span class="chip">{{ status_counts['pending'] }} en attente</span>
+					<span class="chip">{{ status_counts['validated'] }} validees</span>
 				</div>
-			{% else %}
-				<div class="empty-state" style="margin: 1.4rem;">Aucun utilisateur pour le moment.</div>
-			{% endif %}
+			</a>
+		</div>
 	</section>
-
-	<section class="panel">
-		<p class="eyebrow">À venir</p>
-		<h2>Inscriptions aux courses</h2>
-		<p class="hero-copy">Section réservée.</p>
-	</section>
-{% endblock %}
-
-{% block scripts %}
-	<script>
-		(function () {
-			var copyButton = document.getElementById("copy-registration-link");
-			var registrationInput = document.getElementById("registration-link");
-			var feedback = document.getElementById("copy-feedback");
-
-			if (!copyButton || !registrationInput || !feedback) {
-				return;
-			}
-
-			copyButton.addEventListener("click", async function () {
-				var link = registrationInput.value;
-				if (!link) {
-					feedback.textContent = "Aucun lien disponible.";
-					return;
-				}
-
-				try {
-					if (navigator.clipboard && navigator.clipboard.writeText) {
-						await navigator.clipboard.writeText(link);
-					} else {
-						registrationInput.focus();
-						registrationInput.select();
-						document.execCommand("copy");
-					}
-					feedback.textContent = "Lien copie dans le presse-papier.";
-				} catch (error) {
-					feedback.textContent = "Copie impossible. Copiez le lien manuellement.";
-				}
-			});
-
-			function setRowEditingMode(row, isEditing) {
-				if (!row) {
-					return;
-				}
-
-				row.classList.toggle("is-editing", isEditing);
-				row.querySelectorAll(".js-display").forEach(function (el) { el.hidden = isEditing; });
-				row.querySelectorAll(".js-editor").forEach(function (el) {
-					el.hidden = !isEditing;
-					el.disabled = !isEditing;
-				});
-				row.querySelectorAll(".js-view-action").forEach(function (el) { el.hidden = isEditing; });
-				row.querySelectorAll(".js-edit-action").forEach(function (el) { el.hidden = !isEditing; });
-			}
-
-			document.querySelectorAll("tr.user-row").forEach(function (row) {
-				setRowEditingMode(row, false);
-			});
-
-			document.querySelectorAll(".js-edit-row").forEach(function (editButton) {
-				editButton.addEventListener("click", function () {
-					var row = editButton.closest("tr.user-row");
-					if (!row) {
-						return;
-					}
-
-					setRowEditingMode(row, true);
-				});
-			});
-
-			document.querySelectorAll(".js-cancel-row").forEach(function (cancelButton) {
-				cancelButton.addEventListener("click", function () {
-					var row = cancelButton.closest("tr.user-row");
-					if (!row) {
-						return;
-					}
-					var formId = row.getAttribute("data-form-id");
-					var form = formId ? document.getElementById(formId) : null;
-					if (form) {
-						form.reset();
-					}
-
-					setRowEditingMode(row, false);
-				});
-			});
-		})();
-	</script>
 {% endblock %}

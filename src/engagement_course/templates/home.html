@@ -1,10 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}Courses | Engagement Course{% endblock %}
-
 {% block content %}
 	{% set selected_departments = request.args.getlist('department') %}
+	{% set requested_categories = request.args.getlist('category') %}
 	{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
+	{% set category_filter_mode = category_filter_mode if category_filter_mode is defined else ('explicit' if requested_categories else 'none') %}
+	{% set access_numbers = available_category_filters.get('ACCESS', []) %}
+	{% set open_numbers = available_category_filters.get('OPEN', []) %}
+	{% set visible_department_count = selected_departments|length if selected_departments else available_departments|length %}
+	{% set department_scope_label = 'Filtrés' if selected_departments else 'Tous visibles' %}
+	{% set total_category_count = namespace(value=0) %}
+	{% for level, numbers in available_category_filters.items() %}
+		{% set total_category_count.value = total_category_count.value + numbers|length %}
+	{% endfor %}
+	{% set visible_category_count = selected_categories|length if selected_categories else total_category_count.value %}
+	{% set category_scope_label = 'Filtrées' if category_filter_mode == 'explicit' else ('Par défaut' if category_filter_mode == 'default' else 'Toutes visibles') %}
+	{% set explicit_date_from = request.args.get('date_from', '') %}
+	{% set explicit_date_to = request.args.get('date_to', '') %}
+	{% set active_filter_count = selected_departments|length + selected_categories|length + (1 if explicit_date_from else 0) + (1 if explicit_date_to else 0) %}
 	{% set hero_group_photo = 'groupe_large.jpg' %}
 	{% if selected_categories %}
 		{% if 'ACCESS_1' in selected_categories or 'ACCESS_2' in selected_categories %}
@@ -13,6 +26,7 @@
 			{% set hero_group_photo = 'groupe_A3_A4.jpg' %}
 		{% endif %}
 	{% endif %}
+
 	<section class="hero">
 		<div class="hero-grid">
 			<div>
@@ -25,12 +39,12 @@
 						<div class="stat-value">{{ races|length }}</div>
 					</div>
 					<div class="stat-card">
-						<div class="stat-label">Catégories actives</div>
-						<div class="stat-value">{{ selected_categories|length }}</div>
+						<div class="stat-label">Catégories visibles</div>
+						<div class="stat-value">{{ visible_category_count }}</div>
 					</div>
 					<div class="stat-card">
 						<div class="stat-label">Date de depart</div>
-						<div class="stat-value">{{ request.args.get('date_from', now) }}</div>
+						<div class="stat-value">{{ explicit_date_from or now }}</div>
 					</div>
 				</div>
 			</div>
@@ -52,18 +66,32 @@
 	</section>
 
 	<div class="content-grid">
-		<aside class="panel panel-stack panel-sticky">
-			<div>
-				<p class="eyebrow">Filtres</p>
-				<h2>Filtres</h2>
+		<aside class="panel panel-sticky filter-panel">
+			<div class="filter-panel-header">
+				<div>
+					<p class="eyebrow">Filtres</p>
+					<h2>Filtres</h2>
+				</div>
+				<div class="filter-panel-meta">
+					<span class="chip">{{ active_filter_count }} actif{% if active_filter_count > 1 %}s{% endif %}</span>
+					<span class="chip">{{ available_departments|length }} dep.</span>
+					<span class="chip">{{ visible_category_count }} cat.</span>
+				</div>
 			</div>
 
-			<form method="get" action="{{ url_for('main.index') }}" class="panel-stack">
-				<fieldset class="field-block full">
-					<legend>Departement</legend>
-					<div class="checkbox-grid">
+			<form method="get" action="{{ url_for('calendar.index') }}" class="filter-form-compact">
+				<input type="hidden" name="category_filter_submitted" value="1">
+				<fieldset class="field-block full filter-group">
+					<legend class="filter-group-header">
+						<span>Départements</span>
+						<div class="filter-group-header-meta">
+							<span class="filter-group-scope">{{ department_scope_label }}</span>
+							<span class="filter-summary-count">{{ visible_department_count }}</span>
+						</div>
+					</legend>
+					<div class="checkbox-grid checkbox-grid-compact">
 						{% for dept in available_departments %}
-							<label class="checkbox-pill">
+							<label class="checkbox-pill checkbox-pill-compact">
 								<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}>
 								<span>{{ dept }}</span>
 							</label>
@@ -71,35 +99,62 @@
 					</div>
 				</fieldset>
 
-				<fieldset class="field-block full">
-					<legend>Catégorie</legend>
-					<div class="checkbox-grid">
-						{% for level, numbers in available_category_filters.items() %}
-							{% for num in numbers %}
-								{% set key = level ~ '_' ~ num %}
-								<label class="checkbox-pill">
-									<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
-									<span>{{ level }} {{ num }}</span>
-								</label>
-							{% endfor %}
-						{% endfor %}
+				<fieldset class="field-block full filter-group">
+					<legend class="filter-group-header">
+						<span>Catégories</span>
+						<div class="filter-group-header-meta">
+							<span class="filter-group-scope">{{ category_scope_label }}</span>
+							<span class="filter-summary-count">{{ visible_category_count }}</span>
+						</div>
+					</legend>
+					<div class="filter-category-groups filter-scroll-area">
+						<div class="filter-category-block filter-category-block-primary">
+							<div class="filter-category-title-row">
+								<span class="filter-category-title">ACCESS</span>
+								<span class="filter-category-count">{{ access_numbers|length }}</span>
+							</div>
+							<div class="checkbox-grid checkbox-grid-compact checkbox-grid-categories">
+								{% for num in access_numbers %}
+									{% set key = 'ACCESS_' ~ num %}
+									<label class="checkbox-pill checkbox-pill-compact checkbox-pill-category-access">
+										<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
+										<span>ACCESS {{ num }}</span>
+									</label>
+								{% endfor %}
+							</div>
+						</div>
+						<div class="filter-category-block">
+							<div class="filter-category-title-row">
+								<span class="filter-category-title">OPEN</span>
+								<span class="filter-category-count">{{ open_numbers|length }}</span>
+							</div>
+							<div class="checkbox-grid checkbox-grid-compact checkbox-grid-categories">
+								{% for num in open_numbers %}
+									{% set key = 'OPEN_' ~ num %}
+									<label class="checkbox-pill checkbox-pill-compact">
+										<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
+										<span>OPEN {{ num }}</span>
+									</label>
+								{% endfor %}
+							</div>
+						</div>
 					</div>
 				</fieldset>
 
-				<div class="field-grid">
+				<div class="field-grid filter-group filter-group-dates">
 					<div class="field">
 						<label for="date_from">Du</label>
-						<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ request.args.get('date_from', '') }}">
+						<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ explicit_date_from }}">
 					</div>
 					<div class="field">
 						<label for="date_to">Au</label>
-						<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ request.args.get('date_to', '') }}">
+						<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ explicit_date_to }}">
 					</div>
 				</div>
 
-				<div class="form-actions">
+				<div class="form-actions filter-actions">
 					<button type="submit">Appliquer</button>
-					<a class="button button-ghost" href="{{ url_for('main.index') }}">Réinitialiser</a>
+					<a class="button button-ghost" href="{{ url_for('calendar.index', reset=1) }}">Réinitialiser</a>
 				</div>
 			</form>
 		</aside>
@@ -121,29 +176,123 @@
 			{% if races %}
 				<ul class="race-grid">
 					{% for race in races %}
-						<li class="race-item">
-							<button type="button" class="race-card" data-modal-id="race-modal-{{ loop.index0 }}">
-								<div class="race-headline">
-									<div>
-										<p class="race-title">{{ race.location }}</p>
-										<p class="race-subtitle">{{ race.race_day }} {{ race.date }} • {{ race.department }}</p>
+						{% set interested_users = race.interested_users if race.interested_users is defined else [] %}
+						{% set pending_users = race.pending_users if race.pending_users is defined else [] %}
+						{% set validated_users = race.validated_users if race.validated_users is defined else [] %}
+						{% set interested_count = race.interested_count if race.interested_count is defined else interested_users|length %}
+						{% set pending_count = race.pending_count if race.pending_count is defined else pending_users|length %}
+						{% set validated_count = race.validated_count if race.validated_count is defined else validated_users|length %}
+						{% set my_status = race.my_status if race.my_status is defined else '' %}
+						{% set my_engagement_id = race.my_engagement_id if race.my_engagement_id is defined else none %}
+						{% set is_engaged = my_status in ['pending', 'validated'] %}
+						{% set selection_state = 'interested' if my_status == 'interested' else ('pending' if is_engaged else 'none') %}
+						{% set card_status = my_status if my_status else 'none' %}
+						<li class="race-item" id="race-{{ race.id }}">
+							<div class="race-card-shell race-card-shell-{{ card_status }}">
+								<div class="race-card" data-modal-id="race-modal-{{ loop.index0 }}" role="button" tabindex="0">
+									<div class="race-card-left race-card-left-{{ card_status }}">
+										<div class="race-place-row">
+											<p class="race-title">{{ race.location }}</p>
+											<span class="race-department-chip">{{ race.department }}</span>
+										</div>
+										<p class="race-event-line">
+											<span class="race-meta-pill">
+												<span class="race-meta-label">Date</span>
+												{{ race.race_day }} {{ race.display_date() }}
+											</span>
+										</p>
+										<div class="race-event-meta-row">
+											<span class="race-meta-pill">
+												<span class="race-meta-label">Fédé</span>
+												{{ race.federation }}
+											</span>
+											<span class="race-meta-pill">
+												<span class="race-meta-label">Type</span>
+												{{ race.type }}
+											</span>
+										</div>
+										<div class="race-category-tags">
+											{% if race.categories %}
+												{% for category in race.categories %}
+													<span class="race-category-tag">{{ category.level }} {{ category.number }}</span>
+												{% endfor %}
+											{% else %}
+												<span class="race-category-tag race-category-tag-empty">Aucune catégorie</span>
+											{% endif %}
+										</div>
 									</div>
-									<span class="tag tag-accent">{{ race.type }}</span>
-								</div>
-								<div class="race-meta">
-									<div>{{ race.race_day }} {{ race.date }} • {{ race.department }} • {{ race.federation }}</div>
-									<div>
-										Catégories:
-										{% if race.categories %}
-											{% for category in race.categories %}
-												{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
-											{% endfor %}
-										{% else %}
-											aucune
+									<div class="race-card-right">
+										<div class="race-status-pill race-status-pill-{{ card_status }}">
+											<span class="status-dot status-dot-{{ my_status if my_status else 'none' }}"></span>
+											{% if my_status == 'validated' %}demande validée{% elif my_status == 'pending' %}demande en attente{% elif my_status == 'interested' %}intéressé{% elif my_status == 'cancelled' %}demande annulée{% else %}aucun statut{% endif %}
+										</div>
+										{% if validated_count > 0 or pending_count > 0 or interested_count > 0 %}
+											<div class="race-counters-row">
+												{% if validated_count > 0 %}
+													<div class="race-counter race-counter-validated" tabindex="0">
+														<span>{{ validated_count }} inscrit{% if validated_count > 1 %}s{% endif %}</span>
+														<div class="race-counter-popover">
+															<ul>{% for user in validated_users %}<li>{{ user }}</li>{% endfor %}</ul>
+														</div>
+													</div>
+												{% endif %}
+												{% if pending_count > 0 %}
+													<div class="race-counter race-counter-pending" tabindex="0">
+														<span>{{ pending_count }} en attente</span>
+														<div class="race-counter-popover">
+															<ul>{% for user in pending_users %}<li>{{ user }}</li>{% endfor %}</ul>
+														</div>
+													</div>
+												{% endif %}
+												{% if interested_count > 0 %}
+													<div class="race-counter race-counter-interested" tabindex="0">
+														<span>{{ interested_count }} intéressé{% if interested_count > 1 %}s{% endif %}</span>
+														<div class="race-counter-popover">
+															<ul>{% for user in interested_users %}<li>{{ user }}</li>{% endfor %}</ul>
+														</div>
+													</div>
+												{% endif %}
+											</div>
 										{% endif %}
+										<div class="race-card-actions">
+											{% if my_status == 'validated' %}
+												<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="PATCH" style="width: 100%;">
+													<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+													<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+													<input type="hidden" name="race_id" value="{{ race.id }}">
+													<button type="submit" name="status" value="cancelled" class="button-danger" style="width: 100%;">Annuler participation</button>
+												</form>
+											{% elif my_status == 'cancelled' %}
+												<div style="color: var(--muted); font-size: 0.9em;">Participation annulée. Les inscrits restent visibles.</div>
+											{% else %}
+												<div style="display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+													<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="flex: 1;">
+														<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+														<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+														<input type="hidden" name="race_id" value="{{ race.id }}">
+														<button type="submit" name="status" value="interested" class="button-secondary engagement-radio {% if my_status == 'interested' %}is-active{% endif %}" style="width: 100%;">Intéressé</button>
+													</form>
+													<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="flex: 1;">
+														<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+														<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+														<input type="hidden" name="race_id" value="{{ race.id }}">
+														<button type="submit" name="status" value="pending" class="engagement-radio {% if is_engaged %}is-active{% endif %}" style="width: 100%;">Demande d'inscription</button>
+													</form>
+													{% if my_engagement_id %}
+														<form method="post" action="{{ url_for('api.delete_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="DELETE">
+															<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+															<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+															<input type="hidden" name="race_id" value="{{ race.id }}">
+															<button type="submit" class="button-icon" aria-label="Annuler l'engagement" title="Annuler" style="padding: 0.5rem; font-size: 1.2em; flex-shrink: 0; background: none; border: none; cursor: pointer;">🚫</button>
+														</form>
+													{% endif %}
+												</div>
+											{% endif %}
+										</div>
+										<div class="race-meta">Cliquer sur la carte pour voir les détails complets de la course.</div>
 									</div>
 								</div>
-							</button>
+							</div>
 						</li>
 					{% endfor %}
 				</ul>
@@ -153,36 +302,20 @@
 		</section>
 	</div>
 
-	{% for race in races %}
-		<dialog id="race-modal-{{ loop.index0 }}">
-			<article class="modal-card">
-				<div class="modal-body panel-stack">
-					<div>
-						<p class="eyebrow">Course</p>
-						<h3>{{ race.location }}</h3>
-						<p class="muted">{{ race.race_day }} {{ race.date }} • Departement {{ race.department }}</p>
-					</div>
-					<div class="tag-list">
-						<span class="tag">{{ race.federation }}</span>
-						<span class="tag tag-accent">{{ race.type }}</span>
-					</div>
-					<p>
-						Catégories:
-						{% if race.categories %}
-							{% for category in race.categories %}
-								{{ category.level }} {{ category.number }}{% if not loop.last %}, {% endif %}
-							{% endfor %}
-						{% else %}
-							aucune
-						{% endif %}
-					</p>
-					<div class="form-actions">
-						<button type="button" class="button-secondary close-modal">Fermer</button>
-					</div>
-				</div>
-			</article>
-		</dialog>
-	{% endfor %}
+{% for race in races %}
+	{% set my_status = race.my_status if race.my_status is defined else '' %}
+	{% set my_engagement_id = race.my_engagement_id if race.my_engagement_id is defined else none %}
+<dialog id="race-modal-{{ loop.index0 }}">
+<article class="modal-card">
+<div class="modal-body panel-stack">
+<p>DETAIL DE LA COURSE, A VENIR</p>
+<div class="form-actions">
+	<button type="button" class="button-secondary close-modal">Fermer</button>
+</div>
+			</div>
+		</article>
+	</dialog>
+{% endfor %}
 {% endblock %}
 
 {% block scripts %}
@@ -213,21 +346,33 @@
 			}
 
 			document.querySelectorAll(".race-card").forEach(function (card) {
-				card.addEventListener("click", function () {
+card.addEventListener("click", function (event) {
+if (event.target.closest("form, button, a, input, select, textarea")) {
+return;
+					}
+					var modalId = card.getAttribute("data-modal-id");
+					openDialog(document.getElementById(modalId));
+				});
+
+				card.addEventListener("keydown", function (event) {
+if (event.key !== "Enter" && event.key !== " ") {
+						return;
+					}
+					event.preventDefault();
 					var modalId = card.getAttribute("data-modal-id");
 					openDialog(document.getElementById(modalId));
 				});
 			});
 
 			document.querySelectorAll("dialog .close-modal").forEach(function (button) {
-				button.addEventListener("click", function () {
+button.addEventListener("click", function () {
 					closeDialog(button.closest("dialog"));
 				});
 			});
 
 			document.querySelectorAll("dialog").forEach(function (dialog) {
-				dialog.addEventListener("click", function (event) {
-					var rect = dialog.getBoundingClientRect();
+dialog.addEventListener("click", function (event) {
+var rect = dialog.getBoundingClientRect();
 					var isInDialog =
 						rect.top <= event.clientY &&
 						event.clientY <= rect.top + rect.height &&
@@ -238,6 +383,149 @@
 						closeDialog(dialog);
 					}
 				});
+			});
+
+			function getCsrfToken(form) {
+				var csrfInput = form.querySelector('input[name="csrf_token"]');
+				return csrfInput ? csrfInput.value : "";
+			}
+
+			function getRaceId(form) {
+				var raceIdInput = form.querySelector('input[name="race_id"]');
+				if (raceIdInput && raceIdInput.value) {
+					return raceIdInput.value;
+				}
+				return null;
+			}
+
+			async function apiCall(method, url, payload, csrfToken) {
+				var headers = {
+					"Content-Type": "application/json",
+					"X-Requested-With": "XMLHttpRequest",
+					"X-CSRFToken": csrfToken
+				};
+
+				var response = await fetch(url, {
+					method: method,
+					body: method === "DELETE" ? null : JSON.stringify(payload),
+					headers: headers
+				});
+
+				var data = null;
+				try {
+					data = await response.json();
+				} catch (e) {
+					// Response is not JSON, ignore.
+				}
+
+				return { ok: response.ok, status: response.status, data: data };
+			}
+
+			async function handleEngagementCreate(form, statusValue) {
+				var button = form.querySelector('button[name="status"][value="' + statusValue + '"]');
+				if (!button) return;
+				button.disabled = true;
+
+				try {
+					var userIdInput = form.querySelector('input[name="user_id"]');
+					var raceIdInput = form.querySelector('input[name="race_id"]');
+					
+					var payload = {
+						user_id: userIdInput ? Number(userIdInput.value) : null,
+						race_id: raceIdInput ? Number(raceIdInput.value) : null,
+						status: statusValue
+					};
+
+					var result = await apiCall("POST", form.action, payload, getCsrfToken(form));
+
+					if (!result.ok) {
+						var errorMsg = "Une erreur est survenue";
+						if (result.data && result.data.message) {
+							errorMsg = result.data.message;
+						}
+						alert(errorMsg);
+						return;
+					}
+
+					window.location.reload();
+				} catch (error) {
+					alert("Impossible de contacter le serveur");
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			async function handleEngagementUpdate(form, statusValue) {
+				var button = form.querySelector('button[name="status"][value="' + statusValue + '"]');
+				if (!button) return;
+				button.disabled = true;
+
+				try {
+					var payload = { status: statusValue };
+					var result = await apiCall("PATCH", form.action, payload, getCsrfToken(form));
+
+					if (!result.ok) {
+						var errorMsg = "Une erreur est survenue";
+						if (result.data && result.data.message) {
+							errorMsg = result.data.message;
+						}
+						alert(errorMsg);
+						return;
+					}
+
+					window.location.reload();
+				} catch (error) {
+					alert("Impossible de contacter le serveur");
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			async function handleEngagementDelete(form) {
+				var button = form.querySelector('button[type="submit"]');
+				if (!button) return;
+				button.disabled = true;
+
+				try {
+					var result = await apiCall("DELETE", form.action, null, getCsrfToken(form));
+
+					if (!result.ok) {
+						var errorMsg = "Une erreur est survenue";
+						if (result.data && result.data.message) {
+							errorMsg = result.data.message;
+						}
+						alert(errorMsg);
+						return;
+					}
+
+					window.location.reload();
+				} catch (error) {
+					alert("Impossible de contacter le serveur");
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			document.addEventListener("submit", function (event) {
+				var form = event.target;
+				if (!form || form.dataset.engagementForm !== "true") {
+					return;
+				}
+
+				event.preventDefault();
+				
+				var apiMethod = (form.dataset.apiMethod || "POST").toUpperCase();
+				var submitter = event.submitter;
+
+				if (apiMethod === "POST") {
+					var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
+					handleEngagementCreate(form, statusValue);
+				} else if (apiMethod === "PATCH") {
+					var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
+					handleEngagementUpdate(form, statusValue);
+				} else if (apiMethod === "DELETE") {
+					handleEngagementDelete(form);
+				}
 			});
 		})();
 	</script>

@@ -2,8 +2,8 @@ import sqlite3
 from bcrypt import hashpw, gensalt
 from typing import Optional
 from datetime import datetime
-from engagement_course.config import SQLITE_DB_PATH, DATE_FORMAT
-from engagement_course.models import Category, RaceEvent, RaceFilter, User
+from engagement_course.config import SQLITE_DB_PATH
+from engagement_course.models import Category, RaceEvent, RaceFilter, User, Engagement
 
 
 class DatabaseRepository:
@@ -52,6 +52,28 @@ class DatabaseRepository:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_race_categories_level_number ON race_categories(level, number)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS engagements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    race_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    UNIQUE (user_id, race_id),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_engagements_status ON engagements(status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_engagements_user_id ON engagements(user_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_engagements_race_id ON engagements(race_id)"
             )
             conn.execute(
                 """
@@ -114,6 +136,16 @@ class DatabaseRepository:
                     )
 
 
+    def get_race_by_id(self, race_id:int) -> RaceEvent | None:
+        """
+        Returns a RaceEvent object matching the given id, or None if not found.
+        """
+        races = self.search_races(RaceFilter(id=race_id))
+        if len(races) > 1:
+            raise ValueError(f"Multiple races found with id {race_id}")
+        return races[0] if races else None
+
+
     def list_races(self) -> list[RaceEvent]:
         return self.search_races()
 
@@ -127,6 +159,10 @@ class DatabaseRepository:
         f = filters or RaceFilter()
         where = []
         params = []
+
+        if f.id:
+            where.append("r.id = ?")
+            params.append(f.id)
 
         if f.date_from:
             where.append("r.date >= ?")
@@ -198,6 +234,7 @@ class DatabaseRepository:
             race = races_by_id.get(race_id)
             if race is None:
                 race = RaceEvent(
+                    id=race_id,
                     race_day=row["race_day"],
                     date=datetime.strptime(row["date"], "%Y-%m-%d"),
                     location=row["location"],
@@ -216,7 +253,161 @@ class DatabaseRepository:
                     )
                 )
 
-        return races_by_id.values()
+        return list(races_by_id.values())
+
+
+    def create_engagement(self, user_id: int, race: RaceEvent, status: str) -> int | None:
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO engagements (user_id, race_id, status)
+                    VALUES (?, ?, ?)
+                    """,
+                    (user_id, race.id, status)
+                )
+                return int(cursor.lastrowid)
+            
+        except sqlite3.IntegrityError as e:
+            raise ValueError("Un engagement existe déjà pour cet utilisateur et cette course") from e
+
+
+    def update_engagement(self, engagement_id: int, status: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE engagements
+                SET status = ?
+                WHERE id = ?
+                """,
+                (status, engagement_id)
+            )
+
+
+    def delete_engagement(self, engagement_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM engagements WHERE id = ?",
+                (engagement_id,)
+            )
+
+
+    def get_engagement_by_id(self, engagement_id: int) -> Engagement | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, user_id, race_id, status
+                FROM engagements
+                WHERE id = ?
+                """,
+                (engagement_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return Engagement(
+            id=row["id"],
+            user=self.get_user_by_id(row["user_id"]),
+            race=self.get_race_by_id(row["race_id"]),
+            status=row["status"],
+        )
+
+    
+    def list_engagements(self, status: Optional[str] = None) -> list[Engagement]:
+        """
+        Returns a list of engagements, optionally filtered by status.
+        If status is None, returns all engagements.
+        
+        Arguments:
+        - status: optional filter to return only engagements with a specific status (e.g., "pending", "validated", "interested")
+        Returns: a list of Engagement objects matching the criteria
+        """
+        engagements = []
+        with self._connect() as conn:
+            query = "SELECT id, user_id, race_id, status FROM engagements"
+            params = []
+            if status is not None:
+                query += " WHERE status = ?"
+                params.append(status)
+            rows = conn.execute(query, params).fetchall()
+        
+        for row in rows:
+            engagements.append(
+                Engagement(
+                    id=row["id"],
+                    user=self.get_user_by_id(row["user_id"]),
+                    race=self.get_race_by_id(row["race_id"]),
+                    status=row["status"],
+                )
+            )
+        return engagements
+
+
+    def list_user_engagements(self, user: Optional[User]) -> list[Engagement]:
+        """
+        Returns a list of engagements for a given user.
+        If none is provided, returns current user's engagements.
+
+        Arguments:
+        - user: target user
+        Returns: a list of Engagement objects matching the criteria
+        """
+        if user is None:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, user_id, race_id, status FROM engagements
+                WHERE user_id = ?
+                """,
+                (user.user_id,)
+            ).fetchall()
+
+        engagements = []
+        for row in rows:
+            engagements.append(
+                Engagement(
+                    id=row["id"],
+                    user=user,
+                    race=self.get_race_by_id(row["race_id"]),
+                    status=row["status"],
+                )
+            )
+        return list(engagements)
+    
+
+    def list_race_engagements(self, race_id: int, status: Optional[str] = None) -> list[Engagement]:
+        """
+        Returns a list of engagements for a given race
+
+        Arguments:
+        - race_id: target race
+        - status: optional filter to return only engagements with a specific status (e.g., "validated", "pending", "interested")
+        Returns: a list of Engagement objects matching the criteria
+        """
+        engagements = []
+        with self._connect() as conn:
+            query = """
+                SELECT id, user_id, race_id, status FROM engagements
+                WHERE race_id = ?
+            """
+            params = [race_id]
+            if status is not None:
+                query += " AND status = ?"
+                params.append(status)
+            rows = conn.execute(query, params).fetchall()
+
+        for row in rows:
+            engagements.append(
+                Engagement(
+                    id=row["id"],
+                    user=self.get_user_by_id(row["user_id"]),
+                    race=self.get_race_by_id(row["race_id"]),
+                    status=row["status"],
+                )
+            )
+        return engagements
 
 
     def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None) -> int:

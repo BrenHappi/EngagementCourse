@@ -3,14 +3,15 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>{% block title %}Engagement Course{% endblock %}</title>
+	<title>{% block title %}ASPTT | Courses{% endblock %}</title>
+	<link rel="icon" type="image/png" href="{{ url_for('static', filename='hermine_symbole.png') }}">
 	<link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 	{% block head %}{% endblock %}
 </head>
 <body class="{{ body_class | default('') }}">
 	<div class="site-shell">
 		<header class="topbar">
-			<a class="brand" href="{{ url_for('main.index') if current_user.is_authenticated else url_for('auth.login') }}">
+			<a class="brand" href="{{ url_for('calendar.index') if current_user.is_authenticated else url_for('auth.login') }}">
 				<span class="brand-lockup">
 					<span class="brand-mark">
 						<img src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
@@ -27,7 +28,7 @@
 			<div class="topbar-actions">
 				{% if current_user.is_authenticated %}
 					<nav class="topbar-nav" aria-label="navigation principale">
-						<a class="pill-link" href="{{ url_for('main.index') }}">Courses</a>
+						<a class="pill-link" href="{{ url_for('calendar.index') }}">Courses</a>
 						{% if current_user.role == 'admin' %}
 							<a class="pill-link" href="{{ url_for('admin.admin') }}">Administration</a>
 						{% endif %}

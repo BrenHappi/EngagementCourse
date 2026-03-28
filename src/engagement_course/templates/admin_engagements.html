@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Demandes | Engagement Course{% endblock %}
+
+{% block content %}
+	<section class="hero hero-compact">
+		<div class="hero-grid">
+			<div>
+				<p class="eyebrow">Administration</p>
+				<h1>Demandes d'inscription</h1>
+				<p class="hero-copy">Validation rapide des engagements en attente, avec consultation directe des demandes validees et rejetees.</p>
+				<div class="tag-list">
+					<span class="tag tag-accent">En attente {{ status_counts['pending'] }}</span>
+					<span class="tag">Validees {{ status_counts['validated'] }}</span>
+					<span class="tag">Rejetees {{ status_counts['cancelled'] }}</span>
+				</div>
+			</div>
+			<div class="hero-brand">
+				<img class="hero-brand-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
+				<img class="hero-brand-hermine" src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
+				<div class="hero-brand-content">
+					<p class="eyebrow">Vue active</p>
+					<p class="hero-brand-title">{{ status_counts[selected_status] }} demande{% if status_counts[selected_status] > 1 %}s{% endif %}</p>
+					<div class="tag-list">
+						<span class="tag tag-accent">
+							{% if selected_status == 'pending' %}En attente{% elif selected_status == 'validated' %}Validees{% else %}Rejetees{% endif %}
+						</span>
+						<span class="tag">Trie par date de course</span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	{% set active_admin_section = 'engagements' %}
+	{% include "partials/admin_nav.html" %}
+
+	<section class="panel panel-stack">
+		<div class="panel-title-row">
+			<div>
+				<p class="eyebrow">Sections</p>
+				<h2>Navigation rapide</h2>
+			</div>
+			<a class="button-secondary" href="{{ url_for('admin.admin') }}">Retour menu admin</a>
+		</div>
+		<div class="engagement-status-nav">
+			<a class="engagement-status-link {% if selected_status == 'pending' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='pending') }}">
+				<span>En attente</span>
+				<span class="chip">{{ status_counts['pending'] }}</span>
+			</a>
+			<a class="engagement-status-link {% if selected_status == 'validated' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='validated') }}">
+				<span>Validees</span>
+				<span class="chip">{{ status_counts['validated'] }}</span>
+			</a>
+			<a class="engagement-status-link {% if selected_status == 'cancelled' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='cancelled') }}">
+				<span>Rejetees</span>
+				<span class="chip">{{ status_counts['cancelled'] }}</span>
+			</a>
+		</div>
+	</section>
+
+	<section class="engagement-list" aria-label="liste des engagements">
+		{% for engagement in engagements %}
+			<article class="panel engagement-card">
+				<div class="engagement-card-main">
+					<div class="engagement-course-block">
+						<p class="engagement-course-line">
+							<strong>{{ engagement.race.location|upper }} ({{ engagement.race.department }})</strong>
+							<span> - </span>
+							<span>
+								{% for category in engagement.race.categories %}
+									{{ category }}{% if not loop.last %} / {% endif %}
+								{% endfor %}
+							</span>
+						</p>
+						<p class="engagement-date-line">{{ engagement.race.race_day }} {{ engagement.race.display_date() }}</p>
+					</div>
+
+					<div class="engagement-identity-block">
+						<p class="engagement-username-line">@{{ engagement.user.username }}</p>
+						<p
+							class="engagement-user-meta"
+							title="{{ engagement.user.firstname }} {{ engagement.user.lastname }} · {{ engagement.user.email }}{% if engagement.user.category %} · {{ engagement.user.category }}{% endif %}"
+						>
+							{{ engagement.user.firstname }} {{ engagement.user.lastname }} · {{ engagement.user.email }}
+						</p>
+					</div>
+
+					<div class="engagement-status-panel compact-status-panel">
+						<span class="chip {% if engagement.status == 'pending' %}status-chip-pending{% elif engagement.status == 'validated' %}status-chip-validated{% else %}status-chip-cancelled{% endif %}">
+							{% if engagement.status == 'pending' %}En attente{% elif engagement.status == 'validated' %}Validee{% else %}Rejetee{% endif %}
+						</span>
+						{% if selected_status == 'pending' %}
+							<div class="engagement-inline-actions">
+								<form method="post" class="engagement-icon-form js-engagement-decision" data-confirm-label="valider" data-skip-key="engagement-confirm-skip">
+									<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+									<input type="hidden" name="engagement_id" value="{{ engagement.id }}">
+									<input type="hidden" name="status" value="validated">
+									<button class="icon-btn icon-confirm" type="submit" aria-label="Valider" title="Valider">
+										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+											<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+										</svg>
+									</button>
+								</form>
+								<form method="post" class="engagement-icon-form js-engagement-decision" data-confirm-label="refuser" data-skip-key="engagement-confirm-skip">
+									<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+									<input type="hidden" name="engagement_id" value="{{ engagement.id }}">
+									<input type="hidden" name="status" value="cancelled">
+									<button class="icon-btn icon-danger" type="submit" aria-label="Refuser" title="Refuser">
+										<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+											<path d="M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
+											<path d="m6 6 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
+										</svg>
+									</button>
+								</form>
+							</div>
+						{% endif %}
+					</div>
+				</div>
+			</article>
+		{% else %}
+			<section class="panel">
+				<p class="eyebrow">Aucune donnee</p>
+				<h2>Rien a afficher</h2>
+				<p class="hero-copy">Aucun engagement dans cette section pour le moment.</p>
+			</section>
+		{% endfor %}
+	</section>
+
+	<dialog class="decision-modal" id="engagement-decision-modal">
+		<form method="dialog" class="decision-modal-card">
+			<p class="eyebrow">Confirmation</p>
+			<h2 id="decision-modal-title">Confirmer l'action</h2>
+			<p class="hero-copy" id="decision-modal-copy">Cette action va mettre a jour le statut de la demande.</p>
+			<label class="decision-modal-checkbox">
+				<input type="checkbox" id="decision-modal-skip">
+				<span>Ne plus afficher cette confirmation</span>
+			</label>
+			<div class="decision-modal-actions">
+				<button class="button-secondary" type="button" id="decision-modal-cancel">Annuler</button>
+				<button type="submit" id="decision-modal-confirm" value="default">Confirmer</button>
+			</div>
+		</form>
+	</dialog>
+{% endblock %}
+
+{% block scripts %}
+	<script>
+		(function () {
+			var modal = document.getElementById("engagement-decision-modal");
+			var modalTitle = document.getElementById("decision-modal-title");
+			var modalCopy = document.getElementById("decision-modal-copy");
+			var modalSkip = document.getElementById("decision-modal-skip");
+			var modalCancel = document.getElementById("decision-modal-cancel");
+			var modalConfirm = document.getElementById("decision-modal-confirm");
+			var pendingForm = null;
+
+			if (!modal || !modalTitle || !modalCopy || !modalSkip || !modalCancel || !modalConfirm) {
+				return;
+			}
+
+			document.querySelectorAll(".js-engagement-decision").forEach(function (form) {
+				form.addEventListener("submit", function (event) {
+					var skipKey = form.getAttribute("data-skip-key");
+					if (skipKey && window.localStorage.getItem(skipKey) === "1") {
+						return;
+					}
+
+					event.preventDefault();
+					pendingForm = form;
+					modalSkip.checked = false;
+					var actionLabel = form.getAttribute("data-confirm-label") || "mettre a jour";
+					modalTitle.textContent = actionLabel === "valider" ? "Valider cette demande ?" : "Refuser cette demande ?";
+					modalCopy.textContent = actionLabel === "valider"
+						? "La demande passera dans les engagements valides."
+						: "La demande passera dans les engagements rejetes.";
+					modal.showModal();
+				});
+			});
+
+			modalCancel.addEventListener("click", function () {
+				pendingForm = null;
+				modal.close();
+			});
+
+			modal.addEventListener("close", function () {
+				if (modal.returnValue !== "default" || !pendingForm) {
+					return;
+				}
+
+				var skipKey = pendingForm.getAttribute("data-skip-key");
+				if (skipKey && modalSkip.checked) {
+					window.localStorage.setItem(skipKey, "1");
+				}
+
+				var formToSubmit = pendingForm;
+				pendingForm = null;
+				formToSubmit.submit();
+			});
+		})();
+	</script>
+{% endblock %}

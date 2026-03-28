@@ -1,0 +1,5 @@
+<nav class="admin-switcher" aria-label="menu administration">
+	<a class="admin-switcher-link {% if active_admin_section == 'home' %}is-active{% endif %}" href="{{ url_for('admin.admin') }}">Accueil admin</a>
+	<a class="admin-switcher-link {% if active_admin_section == 'users' %}is-active{% endif %}" href="{{ url_for('admin.manage_users') }}">Gestion des utilisateurs</a>
+	<a class="admin-switcher-link {% if active_admin_section == 'engagements' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements') }}">Validation des courses</a>
+</nav>

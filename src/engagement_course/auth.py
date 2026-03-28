@@ -30,7 +30,7 @@ def get_repo():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("main.index"))
+        return redirect(url_for("calendar.index"))
 
     form = LoginForm()
 
@@ -41,7 +41,7 @@ def login():
         user = get_repo().get_user_by_email(email_or_username) or get_repo().get_user_by_username(email_or_username)
         if user and user.verify_password(password):
             login_user(user)
-            return redirect(url_for('main.index'))
+            return redirect(url_for('calendar.index'))
 
         flash("Email ou mot de passe incorrect")
 

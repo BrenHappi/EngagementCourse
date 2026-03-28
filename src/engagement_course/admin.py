@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, current_app, abort, request, flash, redirect, url_for
 from flask_login import current_user, login_required
-from engagement_course.models import CATEGORIES, Category
 from flask_wtf import FlaskForm
 from wtforms import HiddenField, PasswordField, SelectField, StringField
 from wtforms.validators import DataRequired, Optional
+from engagement_course.utils import get_db
+from engagement_course.models import CATEGORIES, Category, EngagementStatus
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -28,15 +29,46 @@ class AdminUpdateUserForm(FlaskForm):
 class AdminDeleteUserForm(FlaskForm):
     user_id = HiddenField(validators=[DataRequired()])
 
+class AdminUpdateEngagementForm(FlaskForm):
+    engagement_id = HiddenField(validators=[DataRequired()])
+    status = SelectField(
+        choices=[
+            (EngagementStatus.VALIDATED.value, "Validee"),
+            (EngagementStatus.CANCELLED.value, "Rejetee"),
+        ],
+        validators=[DataRequired()],
+    )
+    # TODO: add reason for cancellation
 
 
-@admin_bp.route("/admin", methods=["GET", "POST"])
+@admin_bp.route("/admin")
 @login_required
 def admin():
     if current_user.role != "admin":
         abort(403)
 
-    db = current_app.config["repository"]
+    db = get_db()
+    users = db.list_users()
+    status_counts = {
+        EngagementStatus.PENDING.value: len(db.list_engagements(status=EngagementStatus.PENDING.value)),
+        EngagementStatus.VALIDATED.value: len(db.list_engagements(status=EngagementStatus.VALIDATED.value)),
+        EngagementStatus.CANCELLED.value: len(db.list_engagements(status=EngagementStatus.CANCELLED.value)),
+    }
+
+    return render_template(
+        "admin.html",
+        user_count=len(users),
+        status_counts=status_counts,
+    )
+
+
+@admin_bp.route("/admin/users", methods=["GET", "POST"])
+@login_required
+def manage_users():
+    if current_user.role != "admin":
+        abort(403)
+
+    db = get_db()
     users = db.list_users()
 
     registration_url = "http://localhost:3000/register?_t=" + current_app.config['registration_token']
@@ -60,13 +92,13 @@ def admin():
 
                     if not all([firstname, lastname, email, password, role]):
                         flash("Tous les champs sont requis pour créer un utilisateur")
-                        return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_email(email):
                         flash("Un utilisateur avec cet email existe déjà")
-                        return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_username(username):
                         flash("Un utilisateur avec ce nom d'utilisateur existe déjà")
-                        return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)                        
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)                        
 
                     if role.lower() not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
@@ -81,7 +113,7 @@ def admin():
                         role=role.lower(),
                     )
                     flash("Utilisateur créé avec succès")
-                    return redirect(url_for("admin.admin"))
+                    return redirect(url_for("admin.manage_users"))
 
             case "update_user":
                 form = AdminUpdateUserForm()
@@ -103,10 +135,10 @@ def admin():
                         abort(404, description="Utilisateur non trouvé")
                     if db.get_user_by_email(email) and db.get_user_by_email(email).id != user_id:
                         flash("Un utilisateur avec cet email existe déjà")
-                        return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_username(username) and db.get_user_by_username(username).id != user_id:
                         flash("Un utilisateur avec ce nom d'utilisateur existe déjà")
-                        return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if role not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
 
@@ -120,7 +152,7 @@ def admin():
                         role=role.lower() if role else None,
                     )
                     flash(f"Utilisateur {user_id} ({username}) mis à jour avec succès")
-                    return redirect(url_for("admin.admin"))
+                    return redirect(url_for("admin.manage_users"))
 
             case "delete_user":
                 form = AdminDeleteUserForm()
@@ -131,9 +163,77 @@ def admin():
                         abort(404, description="Utilisateur non trouvé")
                     db.delete_user(user_id)
                     flash(f"Utilisateur {user_id} ({user.username}) supprimé avec succès")
-                    return redirect(url_for("admin.admin"))
+                    return redirect(url_for("admin.manage_users"))
 
             case _:
                 abort(400, description="Invalid action")
 
-    return render_template("admin.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+    return render_template(
+        "admin_users.html",
+        users=users,
+        registration_url=registration_url,
+        available_category_filters=CATEGORIES,
+    )
+
+
+@admin_bp.route("/admin/engagements", methods=["GET", "POST"])
+@login_required
+def manage_engagements():
+    if current_user.role != "admin":
+        abort(403)
+
+    db = get_db()
+
+    if request.method == "POST":
+        form = AdminUpdateEngagementForm()
+        if form.validate_on_submit():
+            engagement_id = int(form.engagement_id.data)
+            engagement = db.get_engagement_by_id(engagement_id)
+            if not engagement:
+                abort(404, description="Engagement non trouvé")
+            if engagement.status != EngagementStatus.PENDING.value:
+                abort(400, description="Seuls les engagements en statut 'pending' peuvent être mis à jour")
+
+            status_value = form.status.data
+            try:
+                status = EngagementStatus(status_value)
+                if status != EngagementStatus.VALIDATED and status != EngagementStatus.CANCELLED:
+                    abort(400, description="Statut invalide sélectionné")
+            except ValueError:
+                abort(400, description="Statut d'engagement invalide")
+
+            db.update_engagement(engagement_id, status.value)
+            flash(f"Engagement {engagement_id} mis à jour avec succès")
+            return redirect(url_for("admin.manage_engagements"))
+
+    selected_status = request.args.get("status", default=EngagementStatus.PENDING.value)
+    visible_statuses = {
+        EngagementStatus.PENDING.value,
+        EngagementStatus.VALIDATED.value,
+        EngagementStatus.CANCELLED.value,
+    }
+    if selected_status not in visible_statuses:
+        selected_status = EngagementStatus.PENDING.value
+
+    engagements = sorted(
+        db.list_engagements(status=selected_status),
+        key=lambda engagement: (
+            engagement.race.date,
+            engagement.race.location.lower(),
+            engagement.user.lastname.lower(),
+            engagement.user.firstname.lower(),
+        ),
+    )
+    status_counts = {
+        EngagementStatus.PENDING.value: len(db.list_engagements(status=EngagementStatus.PENDING.value)),
+        EngagementStatus.VALIDATED.value: len(db.list_engagements(status=EngagementStatus.VALIDATED.value)),
+        EngagementStatus.CANCELLED.value: len(db.list_engagements(status=EngagementStatus.CANCELLED.value)),
+    }
+
+    return render_template(
+        "admin_engagements.html",
+        engagements=engagements,
+        selected_status=selected_status,
+        status_counts=status_counts,
+        update_form=AdminUpdateEngagementForm(),
+    )

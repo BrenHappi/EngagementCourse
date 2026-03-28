@@ -1,20 +1,31 @@
 from datetime import date
+from enum import Enum
 import re
 from typing import Optional
 from dataclasses import dataclass
 from bcrypt import checkpw
 import flask_login
 
-ROLES = {
+from engagement_course.config import DATE_FORMAT
+
+USER_ROLES = {
     1: "admin",
     2: "user"
 }
 
-# Supported categories
 CATEGORIES = {
     "OPEN": [1, 2, 3],
     "ACCESS": [1, 2, 3, 4],
 }
+
+
+class EngagementStatus(str, Enum):
+    NONE = "none"
+    INTERESTED = "interested"
+    PENDING = "pending"
+    VALIDATED = "validated"
+    CANCELLED = "cancelled"
+    
 
 class Category:
     def __init__(self, level: str, number: int):
@@ -89,9 +100,11 @@ class Category:
     def to_key(self) -> str:
         return f"{self.level}_{self.number}"    
 
+
 class RaceEvent:
     def __init__(
         self,
+        id: int,
         race_day: str,
         date: date,
         location: str,
@@ -100,6 +113,7 @@ class RaceEvent:
         type: str,
         categories: list[Category],
     ):
+        self.id = id
         self.race_day = race_day
         self.date = date
         self.location = location
@@ -107,13 +121,23 @@ class RaceEvent:
         self.federation = federation
         self.type = type
         self.categories = categories
-    
+        # engagements
+        self.engagements: list[Engagement] = []
+        self.validated_users: list[User] = []
+        self.pending_users: list[User] = []
+        self.interested_users: list[User] = []
+        self.my_status = EngagementStatus.NONE
+
     def __repr__(self):
-        return f"{self.location} ({self.date}) {self.categories}"
+        return f"RaceEvent(id={self.id}, race_day='{self.race_day}', date={self.date}, location='{self.location}', department={self.department}, categories={self.categories})"
+    
+    def display_date(self) -> str:
+        return self.date.strftime(DATE_FORMAT)
 
 
 @dataclass(slots=True)
 class RaceFilter:
+    id: Optional[int] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None
     location: Optional[str] = None
@@ -141,10 +165,24 @@ class User(flask_login.UserMixin):
         self.username = username
         self.password_hash = password_hash
         self.category = category
-        if role not in ROLES.values():
+        if role not in USER_ROLES.values():
             self.role = "user"  # Default to "user"
         else:
             self.role = role
 
+    def __repr__(self):
+        return f"{self.username} ({self.firstname} {self.lastname}) [{self.category}]"
+
     def verify_password(self, password: str) -> bool:
         return checkpw(password.encode('utf-8'), self.password_hash)
+    
+
+class Engagement:
+    def __init__(self, user: User, race: RaceEvent, status: str, id: Optional[int] = None):
+        self.id = id
+        self.user = user
+        self.race = race
+        self.status = status  # e.g., "validated", "pending", "cancelled"
+
+    def __repr__(self):
+        return f"Engagement(id={self.id}, user={self.user}, race={self.race}, status='{self.status}')"
