@@ -33,6 +33,12 @@
 							<a class="pill-link" href="{{ url_for('admin.admin') }}">Administration</a>
 						{% endif %}
 					</nav>
+					<a class="button-secondary icon-btn icon-toolbar icon-profile-access" href="{{ url_for('profile.profile') }}" aria-label="Mon profil" title="Mon profil">
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+							<path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+						</svg>
+					</a>
 					<form method="post" action="{{ url_for('auth.logout') }}">
 						<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 						<button class="button-secondary icon-btn icon-toolbar" type="submit" aria-label="Déconnexion" title="Déconnexion">

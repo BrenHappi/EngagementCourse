@@ -5,6 +5,7 @@ from wtforms import HiddenField, PasswordField, SelectField, StringField
 from wtforms.validators import DataRequired, Optional
 
 from engagement_course.models import Category
+from engagement_course.utils import get_db
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -24,21 +25,19 @@ class RegisterForm(FlaskForm):
     password = PasswordField(validators=[DataRequired()])
 
 
-def get_repo():
-    return current_app.config["repository"]
-
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("calendar.index"))
 
+    db = get_db()
     form = LoginForm()
 
     if form.validate_on_submit():
         email_or_username = form.email_or_username.data.strip()
         password = form.password.data
 
-        user = get_repo().get_user_by_email(email_or_username) or get_repo().get_user_by_username(email_or_username)
+        user = db.get_user_by_email(email_or_username) or db.get_user_by_username(email_or_username)
         if user and user.verify_password(password):
             login_user(user)
             return redirect(url_for('calendar.index'))
@@ -59,6 +58,9 @@ def logout():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+
+    db = get_db()
+
     category_options = [("", "Select a category")] + Category.get_category_options()
     form = RegisterForm()
     form.category.choices = category_options
@@ -71,10 +73,11 @@ def register():
             abort(403)
 
         email = (form.email.data or "").strip()
-        username = (form.username.data or "").strip()
         password = form.password.data
+        # TODO: add confirm password field
         firstname = (form.firstname.data or "").strip()
         lastname = (form.lastname.data or "").strip()
+        username = (form.username.data or (firstname[0]+lastname).lower()).strip()
         category_key = form.category.data
         category = Category.from_key(category_key)
 
@@ -82,15 +85,15 @@ def register():
             flash("Veuillez remplir tous les champs obligatoires")
             return render_template("register.html", form=form)
 
-        if get_repo().get_user_by_email(email) is not None:
+        if db.get_user_by_email(email) is not None:
             flash("Un compte avec cet email existe déjà")
             return render_template("register.html", form=form)
 
-        if username and get_repo().get_user_by_username(username) is not None:
+        if username and db.get_user_by_username(username) is not None:
             flash("Un compte avec ce nom d'utilisateur existe déjà")
             return render_template("register.html", form=form)
 
-        get_repo().create_user(
+        db.create_user(
             email=email,
             username=username,
             password=password,

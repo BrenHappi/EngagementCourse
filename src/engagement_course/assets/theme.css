@@ -207,6 +207,22 @@ img {
     background: rgba(255, 255, 255, 0.04);
 }
 
+.icon-profile-access {
+    position: relative;
+}
+
+.icon-profile-access::after {
+    content: "";
+    position: absolute;
+    left: 0.42rem;
+    bottom: 0.42rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 0 0.18rem rgba(119, 212, 255, 0.16);
+}
+
 .button,
 button,
 input[type="submit"] {
@@ -671,6 +687,15 @@ a:focus-visible {
     margin-bottom: 1rem;
 }
 
+.race-search-row {
+    max-width: 420px;
+    margin-bottom: 0.9rem;
+}
+
+.race-search-row label {
+    font-size: 0.82rem;
+}
+
 .field-grid,
 .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -780,6 +805,239 @@ textarea:focus {
     align-items: center;
 }
 
+.profile-hero-grid {
+    align-items: center;
+}
+
+.profile-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.profile-aside {
+    gap: 1.2rem;
+}
+
+.profile-summary-card {
+    display: grid;
+    gap: 1rem;
+    align-content: center;
+    justify-items: start;
+    min-height: 100%;
+    padding: 1.25rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(119, 212, 255, 0.18);
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+        linear-gradient(135deg, rgba(10, 24, 40, 0.98), rgba(11, 55, 99, 0.76));
+}
+
+.profile-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.8rem;
+    height: 4.8rem;
+    border-radius: 1.2rem;
+    background: linear-gradient(135deg, rgba(18, 111, 194, 0.95), rgba(94, 207, 255, 0.92));
+    color: #03111d;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    box-shadow: 0 18px 36px rgba(32, 138, 234, 0.26);
+}
+
+.profile-summary-copy {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.profile-summary-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.profile-stats-grid {
+    margin-top: 1rem;
+}
+
+.stat-value-compact {
+    font-size: clamp(1rem, 1.3vw, 1.35rem);
+    line-height: 1.2;
+}
+
+.profile-panel-title-row {
+    margin-bottom: 0;
+}
+
+.profile-meta-list {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+}
+
+.profile-meta-list div {
+    display: grid;
+    gap: 0.28rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.profile-meta-list div:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.profile-meta-list dt {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.profile-meta-list dd {
+    margin: 0;
+    color: var(--text);
+    font-size: 0.96rem;
+}
+
+.profile-managed-block {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid rgba(119, 212, 255, 0.14);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-form {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.profile-password-block {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-section-copy {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.profile-section-copy h3,
+.profile-section-copy p {
+    margin: 0;
+}
+
+.profile-section-copy h3 {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+}
+
+.profile-section-copy p {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.profile-field-label {
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.profile-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.6rem;
+}
+
+.profile-choice-chip {
+    position: relative;
+    min-height: 3rem;
+    cursor: pointer;
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.profile-choice-chip:hover {
+    border-color: rgba(123, 198, 255, 0.28);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.profile-choice-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.profile-choice-chip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    color: var(--text);
+}
+
+.profile-choice-chip span::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(157, 179, 200, 0.55);
+    background: rgba(255, 255, 255, 0.03);
+    flex: 0 0 auto;
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.profile-choice-chip input:checked + span::before {
+    border-color: rgba(119, 212, 255, 0.95);
+    background: linear-gradient(135deg, #0a70c7, #5ecfff);
+    box-shadow: 0 0 0 0.2rem rgba(119, 212, 255, 0.12);
+}
+
+.profile-choice-chip input:checked + span {
+    color: #ffffff;
+}
+
+.profile-choice-chip:has(input:checked) {
+    border-color: rgba(119, 212, 255, 0.34);
+    background: rgba(119, 212, 255, 0.08);
+    transform: translateY(-1px);
+}
+
+.profile-choice-chip-none {
+    border-style: dashed;
+}
+
+.profile-choice-chip-none:has(input:checked) {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.profile-field-help {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.profile-choice-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.profile-choice-actions .button-secondary {
+    padding: 0.5rem 0.75rem;
+}
+
 .race-grid {
     list-style: none;
     margin: 0;
@@ -791,6 +1049,10 @@ textarea:focus {
 
 .race-item {
     display: grid;
+}
+
+.race-item.race-item-hidden {
+    display: none !important;
 }
 
 .race-card-shell {
@@ -1868,7 +2130,8 @@ tbody tr:hover {
     .hero-grid,
     .content-grid,
     .admin-grid,
-    .auth-grid {
+    .auth-grid,
+    .profile-layout {
         grid-template-columns: 1fr;
     }
 
@@ -1939,6 +2202,19 @@ tbody tr:hover {
         height: 18px;
         right: -5px;
         bottom: -3px;
+    }
+
+    .topbar-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .topbar-nav {
+        flex: 1 1 auto;
+    }
+
+    .profile-summary-card {
+        justify-items: stretch;
     }
 
     .engagement-status-nav {

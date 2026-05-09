@@ -85,7 +85,7 @@ def manage_users():
                     password = form.password.data
                     firstname = (form.firstname.data or "").strip()
                     lastname = (form.lastname.data or "").strip()
-                    username = (form.username.data or (firstname[0]+lastname)).strip()
+                    username = (form.username.data or (firstname[0]+lastname)).strip().lower()
                     role = (form.role.data or "user").strip()
                     category_key = (form.category.data or "").strip()
                     category = Category.from_key(category_key)
@@ -150,6 +150,7 @@ def manage_users():
                         lastname=lastname,
                         category=category,
                         role=role.lower() if role else None,
+                        managed_categories=None
                     )
                     flash(f"Utilisateur {user_id} ({username}) mis à jour avec succès")
                     return redirect(url_for("admin.manage_users"))
@@ -207,6 +208,7 @@ def manage_engagements():
             return redirect(url_for("admin.manage_engagements"))
 
     selected_status = request.args.get("status", default=EngagementStatus.PENDING.value)
+    show_all = request.args.get("show_all", default="false").lower() == "true"
     visible_statuses = {
         EngagementStatus.PENDING.value,
         EngagementStatus.VALIDATED.value,
@@ -215,8 +217,11 @@ def manage_engagements():
     if selected_status not in visible_statuses:
         selected_status = EngagementStatus.PENDING.value
 
+    my_managed_categories = db.get_user_by_id(current_user.user_id).managed_categories if current_user.managed_categories else []
+    filter_categories = [] if show_all else my_managed_categories
+
     engagements = sorted(
-        db.list_engagements(status=selected_status),
+        db.list_engagements(status=selected_status, categories=filter_categories),
         key=lambda engagement: (
             engagement.race.date,
             engagement.race.location.lower(),
@@ -225,9 +230,9 @@ def manage_engagements():
         ),
     )
     status_counts = {
-        EngagementStatus.PENDING.value: len(db.list_engagements(status=EngagementStatus.PENDING.value)),
-        EngagementStatus.VALIDATED.value: len(db.list_engagements(status=EngagementStatus.VALIDATED.value)),
-        EngagementStatus.CANCELLED.value: len(db.list_engagements(status=EngagementStatus.CANCELLED.value)),
+        EngagementStatus.PENDING.value: len(db.list_engagements(status=EngagementStatus.PENDING.value, categories=filter_categories)),
+        EngagementStatus.VALIDATED.value: len(db.list_engagements(status=EngagementStatus.VALIDATED.value, categories=filter_categories)),
+        EngagementStatus.CANCELLED.value: len(db.list_engagements(status=EngagementStatus.CANCELLED.value, categories=filter_categories)),
     }
 
     return render_template(
@@ -235,5 +240,7 @@ def manage_engagements():
         engagements=engagements,
         selected_status=selected_status,
         status_counts=status_counts,
+        show_all=show_all,
+        has_managed_categories=len(my_managed_categories) > 0,
         update_form=AdminUpdateEngagementForm(),
     )

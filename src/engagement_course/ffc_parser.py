@@ -59,7 +59,7 @@ class FFCParser:
                 else:
                     raise Exception(f"Unexpected number of cells: {len(cells)}.\nRow content: {row}")
                 race = RaceEvent(
-                        race_day = day.split()[0],
+                        race_day=day.split()[0],
                         date=datetime.datetime.strptime(day.split()[1]+"/"+month_num+"/"+year, "%d/%m/%Y").date(),
                         location=cells[1-index_offset].text.strip().replace(" .", ""),
                         department=self.department,

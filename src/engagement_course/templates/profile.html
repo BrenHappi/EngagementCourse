@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Profil | Engagement Course{% endblock %}
+
+{% block content %}
+	{% set category_label = user.category|string if user.category else 'Non renseignée' %}
+	{% set managed_count = user.managed_categories|length if user.managed_categories else 0 %}
+	<section class="hero profile-hero">
+		<div class="hero-grid profile-hero-grid">
+			<div>
+				<p class="eyebrow">Mon compte</p>
+				<h1>{{ user.firstname }} {{ user.lastname }}</h1>
+				<p class="hero-copy">Mettez à jour vos informations personnelles, votre catégorie et votre mot de passe depuis un seul espace.</p>
+				<div class="stats-grid profile-stats-grid">
+					<div class="stat-card">
+						<div class="stat-label">Identifiant</div>
+						<div class="stat-value stat-value-compact">@{{ user.username }}</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-label">Rôle</div>
+						<div class="stat-value stat-value-compact">{{ user.role }}</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-label">Catégorie</div>
+						<div class="stat-value stat-value-compact">{{ category_label }}</div>
+					</div>
+				</div>
+			</div>
+			<div class="profile-summary-card">
+				<div class="profile-avatar" aria-hidden="true">{{ user.firstname[:1]|upper if user.firstname else user.username[:1]|upper }}</div>
+				<div class="profile-summary-copy">
+					<p class="eyebrow">Vue rapide</p>
+					<p class="profile-summary-name">{{ user.firstname }} {{ user.lastname }}</p>
+					<div class="chip-row">
+						<span class="chip">{{ category_label }}</span>
+						{% if user.role == 'admin' %}
+							<span class="chip">{{ managed_count }} catégories gérées</span>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<div class="profile-layout">
+		<aside class="panel panel-stack profile-aside">
+			<div class="panel-title-row profile-panel-title-row">
+				<div>
+					<p class="eyebrow">Résumé</p>
+					<h2>Compte</h2>
+				</div>
+			</div>
+			<dl class="profile-meta-list">
+				<div>
+					<dt>Email</dt>
+					<dd>{{ user.email }}</dd>
+				</div>
+				<div>
+					<dt>Nom d'utilisateur</dt>
+					<dd>@{{ user.username }}</dd>
+				</div>
+				<div>
+					<dt>Catégorie</dt>
+					<dd>{{ category_label }}</dd>
+				</div>
+				<div>
+					<dt>Accès</dt>
+					<dd>{{ 'Administration' if user.role == 'admin' else 'Utilisateur' }}</dd>
+				</div>
+			</dl>
+
+			{% if user.role == 'admin' and user.managed_categories %}
+				<div class="profile-managed-block">
+					<p class="eyebrow">Administration</p>
+					<div class="tag-list">
+						{% for managed_category in user.managed_categories %}
+							<span class="tag tag-accent">{{ managed_category }}</span>
+						{% endfor %}
+					</div>
+				</div>
+			{% endif %}
+		</aside>
+
+		<section class="panel panel-stack">
+			<div class="panel-title-row profile-panel-title-row">
+				<div>
+					<p class="eyebrow">Modification</p>
+					<h2>Mettre à jour le profil</h2>
+				</div>
+			</div>
+
+			<form method="post" action="{{ url_for('profile.profile') }}" class="profile-form">
+				{{ profile_form.hidden_tag() }}
+
+				<div class="field-grid">
+					<div class="field">
+						<label for="profile-firstname">Prénom</label>
+						{{ profile_form.firstname(id="profile-firstname", type="text", placeholder="Prénom") }}
+					</div>
+
+					<div class="field">
+						<label for="profile-lastname">Nom</label>
+						{{ profile_form.lastname(id="profile-lastname", type="text", placeholder="Nom") }}
+					</div>
+
+					<div class="field">
+						<label for="profile-username">Nom d'utilisateur</label>
+						{{ profile_form.username(id="profile-username", type="text", placeholder="Nom d'utilisateur") }}
+					</div>
+
+					<div class="field">
+						<label for="profile-category">Catégorie</label>
+						{{ profile_form.category(id="profile-category") }}
+					</div>
+
+					{% if user.role == 'admin' %}
+						<div class="field field-span-2">
+							<span class="profile-field-label">Catégories gérées</span>
+							<div class="profile-choice-grid" id="profile-managed_categories">
+								{% for value, label in profile_form.managed_categories.choices %}
+									<label class="checkbox-pill profile-choice-chip">
+										<input
+											type="checkbox"
+											name="{{ profile_form.managed_categories.name }}"
+											value="{{ value }}"
+											{% if value in profile_form.managed_categories.data %}checked{% endif %}
+										>
+										<span>{{ label }}</span>
+									</label>
+								{% endfor %}
+							</div>
+							<div class="profile-choice-actions">
+								<button type="button" class="button-secondary" id="clear-managed-categories">Tout effacer</button>
+							</div>
+							<p class="profile-field-help">Cliquez sur les catégories à gérer. Tout effacer retire toute sélection.</p>
+						</div>
+					{% endif %}
+				</div>
+
+				<div class="profile-password-block">
+					<div class="profile-section-copy">
+						<p class="eyebrow">Sécurité</p>
+						<h3>Changer le mot de passe</h3>
+						<p>Laissez ces champs vides pour conserver votre mot de passe actuel.</p>
+					</div>
+					<div class="field-grid">
+						<div class="field field-span-2">
+							<label for="profile-current_password">Mot de passe actuel</label>
+							{{ profile_form.current_password(id="profile-current_password", type="password", placeholder="Mot de passe actuel") }}
+						</div>
+						<div class="field">
+							<label for="profile-new_password">Nouveau mot de passe</label>
+							{{ profile_form.new_password(id="profile-new_password", type="password", placeholder="Nouveau mot de passe") }}
+						</div>
+						<div class="field">
+							<label for="profile-confirm_password">Confirmation</label>
+							{{ profile_form.confirm_password(id="profile-confirm_password", type="password", placeholder="Confirmer le mot de passe") }}
+						</div>
+					</div>
+				</div>
+
+				<div class="form-actions">
+					{{ profile_form.submit() }}
+				</div>
+			</form>
+		</section>
+	</div>
+{% endblock %}
+
+{% block scripts %}
+	{{ super() }}
+	<script>
+		(function () {
+			var clearButton = document.getElementById("clear-managed-categories");
+			var managedCategories = document.getElementById("profile-managed_categories");
+			if (!clearButton || !managedCategories) {
+				return;
+			}
+
+			clearButton.addEventListener("click", function () {
+				Array.from(managedCategories.querySelectorAll('input[type="checkbox"]')).forEach(function (checkbox) {
+					checkbox.checked = false;
+				});
+			});
+		})();
+	</script>
+{% endblock %}

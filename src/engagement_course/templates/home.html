@@ -166,12 +166,19 @@
 					<h2>Liste des courses</h2>
 				</div>
 				<div class="chip-row">
-					<span class="chip">{{ races|length }} résultat{% if races|length > 1 %}s{% endif %}</span>
+					<span class="chip" id="race-visible-count" data-total-count="{{ races|length }}">{{ races|length }} résultat{% if races|length > 1 %}s{% endif %}</span>
 					{% if selected_categories %}
 						<span class="chip">{{ selected_categories|join(', ') }}</span>
 					{% endif %}
 				</div>
 			</div>
+
+			{% if races %}
+				<div class="race-search-row field">
+					<label for="race_search">Rechercher une course</label>
+					<input id="race_search" type="text" placeholder="Rechercher une course par lieu ..." autocomplete="off">
+				</div>
+			{% endif %}
 
 			{% if races %}
 				<ul class="race-grid">
@@ -187,7 +194,7 @@
 						{% set is_engaged = my_status in ['pending', 'validated'] %}
 						{% set selection_state = 'interested' if my_status == 'interested' else ('pending' if is_engaged else 'none') %}
 						{% set card_status = my_status if my_status else 'none' %}
-						<li class="race-item" id="race-{{ race.id }}">
+						<li class="race-item" id="race-{{ race.id }}" data-search-text="{{ race.location|lower }}">
 							<div class="race-card-shell race-card-shell-{{ card_status }}">
 								<div class="race-card" data-modal-id="race-modal-{{ loop.index0 }}" role="button" tabindex="0">
 									<div class="race-card-left race-card-left-{{ card_status }}">
@@ -296,6 +303,7 @@
 						</li>
 					{% endfor %}
 				</ul>
+				<div id="race-search-empty-state" class="empty-state" hidden>Aucune course ne correspond à cette recherche.</div>
 			{% else %}
 				<div class="empty-state">Aucune course ne correspond aux filtres actuels.</div>
 			{% endif %}
@@ -345,34 +353,44 @@
 				}
 			}
 
-			document.querySelectorAll(".race-card").forEach(function (card) {
-card.addEventListener("click", function (event) {
-if (event.target.closest("form, button, a, input, select, textarea")) {
-return;
-					}
-					var modalId = card.getAttribute("data-modal-id");
-					openDialog(document.getElementById(modalId));
-				});
+			document.addEventListener("click", function (event) {
+				var closeButton = event.target.closest("dialog .close-modal");
+				if (closeButton) {
+					closeDialog(closeButton.closest("dialog"));
+					return;
+				}
 
-				card.addEventListener("keydown", function (event) {
-if (event.key !== "Enter" && event.key !== " ") {
-						return;
-					}
-					event.preventDefault();
-					var modalId = card.getAttribute("data-modal-id");
-					openDialog(document.getElementById(modalId));
-				});
+				var card = event.target.closest(".race-card");
+				if (!card) {
+					return;
+				}
+
+				if (event.target.closest("form, button, a, input, select, textarea")) {
+					return;
+				}
+
+				var modalId = card.getAttribute("data-modal-id");
+				openDialog(document.getElementById(modalId));
 			});
 
-			document.querySelectorAll("dialog .close-modal").forEach(function (button) {
-button.addEventListener("click", function () {
-					closeDialog(button.closest("dialog"));
-				});
+			document.addEventListener("keydown", function (event) {
+				var card = event.target.closest(".race-card");
+				if (!card) {
+					return;
+				}
+
+				if (event.key !== "Enter" && event.key !== " ") {
+					return;
+				}
+
+				event.preventDefault();
+				var modalId = card.getAttribute("data-modal-id");
+				openDialog(document.getElementById(modalId));
 			});
 
 			document.querySelectorAll("dialog").forEach(function (dialog) {
-dialog.addEventListener("click", function (event) {
-var rect = dialog.getBoundingClientRect();
+				dialog.addEventListener("click", function (event) {
+					var rect = dialog.getBoundingClientRect();
 					var isInDialog =
 						rect.top <= event.clientY &&
 						event.clientY <= rect.top + rect.height &&
@@ -388,14 +406,6 @@ var rect = dialog.getBoundingClientRect();
 			function getCsrfToken(form) {
 				var csrfInput = form.querySelector('input[name="csrf_token"]');
 				return csrfInput ? csrfInput.value : "";
-			}
-
-			function getRaceId(form) {
-				var raceIdInput = form.querySelector('input[name="race_id"]');
-				if (raceIdInput && raceIdInput.value) {
-					return raceIdInput.value;
-				}
-				return null;
 			}
 
 			async function apiCall(method, url, payload, csrfToken) {
@@ -421,80 +431,76 @@ var rect = dialog.getBoundingClientRect();
 				return { ok: response.ok, status: response.status, data: data };
 			}
 
-			async function handleEngagementCreate(form, statusValue) {
-				var button = form.querySelector('button[name="status"][value="' + statusValue + '"]');
-				if (!button) return;
-				button.disabled = true;
+			function getErrorMessage(result) {
+				if (result && result.data && result.data.message) {
+					return result.data.message;
+				}
+				return "Une erreur est survenue";
+			}
 
-				try {
-					var userIdInput = form.querySelector('input[name="user_id"]');
-					var raceIdInput = form.querySelector('input[name="race_id"]');
-					
-					var payload = {
-						user_id: userIdInput ? Number(userIdInput.value) : null,
-						race_id: raceIdInput ? Number(raceIdInput.value) : null,
-						status: statusValue
-					};
+			function normalizeSearchValue(value) {
+				return (value || "")
+					.toLowerCase()
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "")
+					.trim();
+			}
 
-					var result = await apiCall("POST", form.action, payload, getCsrfToken(form));
+			function applyRaceSearchFilter(rawValue) {
+				var query = normalizeSearchValue(rawValue);
+				var visibleCount = 0;
 
-					if (!result.ok) {
-						var errorMsg = "Une erreur est survenue";
-						if (result.data && result.data.message) {
-							errorMsg = result.data.message;
-						}
-						alert(errorMsg);
-						return;
+				document.querySelectorAll(".race-item").forEach(function (item) {
+					var searchableText = normalizeSearchValue(item.getAttribute("data-search-text") || item.textContent);
+					var isVisible = !query || searchableText.includes(query);
+					item.classList.toggle("race-item-hidden", !isVisible);
+					item.setAttribute("aria-hidden", isVisible ? "false" : "true");
+					if (isVisible) {
+						visibleCount += 1;
 					}
+				});
 
-					window.location.reload();
-				} catch (error) {
-					alert("Impossible de contacter le serveur");
-				} finally {
-					button.disabled = false;
+				var countChip = document.getElementById("race-visible-count");
+				if (countChip) {
+					countChip.textContent = visibleCount + " résultat" + (visibleCount > 1 ? "s" : "");
+				}
+
+				var searchEmptyState = document.getElementById("race-search-empty-state");
+				if (searchEmptyState) {
+					searchEmptyState.hidden = visibleCount !== 0;
 				}
 			}
 
-			async function handleEngagementUpdate(form, statusValue) {
-				var button = form.querySelector('button[name="status"][value="' + statusValue + '"]');
-				if (!button) return;
+			async function handleEngagementSubmit(form, submitter) {
+				var apiMethod = (form.dataset.apiMethod || "POST").toUpperCase();
+				var button = submitter || form.querySelector('button[type="submit"]');
+				if (!button) {
+					return;
+				}
+
 				button.disabled = true;
 
 				try {
-					var payload = { status: statusValue };
-					var result = await apiCall("PATCH", form.action, payload, getCsrfToken(form));
+					var payload = null;
 
-					if (!result.ok) {
-						var errorMsg = "Une erreur est survenue";
-						if (result.data && result.data.message) {
-							errorMsg = result.data.message;
-						}
-						alert(errorMsg);
-						return;
+					if (apiMethod === "POST") {
+						var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
+						var userIdInput = form.querySelector('input[name="user_id"]');
+						var raceIdInput = form.querySelector('input[name="race_id"]');
+						payload = {
+							user_id: userIdInput ? Number(userIdInput.value) : null,
+							race_id: raceIdInput ? Number(raceIdInput.value) : null,
+							status: statusValue
+						};
+					} else if (apiMethod === "PATCH") {
+						var patchStatus = submitter && submitter.name === "status" ? submitter.value : "";
+						payload = { status: patchStatus };
 					}
 
-					window.location.reload();
-				} catch (error) {
-					alert("Impossible de contacter le serveur");
-				} finally {
-					button.disabled = false;
-				}
-			}
-
-			async function handleEngagementDelete(form) {
-				var button = form.querySelector('button[type="submit"]');
-				if (!button) return;
-				button.disabled = true;
-
-				try {
-					var result = await apiCall("DELETE", form.action, null, getCsrfToken(form));
+					var result = await apiCall(apiMethod, form.action, payload, getCsrfToken(form));
 
 					if (!result.ok) {
-						var errorMsg = "Une erreur est survenue";
-						if (result.data && result.data.message) {
-							errorMsg = result.data.message;
-						}
-						alert(errorMsg);
+						alert(getErrorMessage(result));
 						return;
 					}
 
@@ -514,19 +520,16 @@ var rect = dialog.getBoundingClientRect();
 
 				event.preventDefault();
 				
-				var apiMethod = (form.dataset.apiMethod || "POST").toUpperCase();
-				var submitter = event.submitter;
-
-				if (apiMethod === "POST") {
-					var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
-					handleEngagementCreate(form, statusValue);
-				} else if (apiMethod === "PATCH") {
-					var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
-					handleEngagementUpdate(form, statusValue);
-				} else if (apiMethod === "DELETE") {
-					handleEngagementDelete(form);
-				}
+				handleEngagementSubmit(form, event.submitter);
 			});
+
+			var raceSearchInput = document.getElementById("race_search");
+			if (raceSearchInput) {
+				raceSearchInput.addEventListener("input", function () {
+					applyRaceSearchFilter(raceSearchInput.value);
+				});
+				applyRaceSearchFilter(raceSearchInput.value);
+			}
 		})();
 	</script>
 {% endblock %}

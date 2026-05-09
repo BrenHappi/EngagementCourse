@@ -104,7 +104,6 @@ class Category:
 class RaceEvent:
     def __init__(
         self,
-        id: int,
         race_day: str,
         date: date,
         location: str,
@@ -112,6 +111,7 @@ class RaceEvent:
         federation: str,
         type: str,
         categories: list[Category],
+        id: Optional[int] = None,
     ):
         self.id = id
         self.race_day = race_day
@@ -156,7 +156,8 @@ class User(flask_login.UserMixin):
     password_hash: bytes
     category: Category
     role: str
-    def __init__(self, email: str, username: str, password_hash: bytes, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, user_id: Optional[int] = None):
+    managed_categories: Optional[list[Category]] = None
+    def __init__(self, email: str, username: str, password_hash: bytes, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, managed_categories: Optional[list[Category]] = None, user_id: Optional[int] = None):
         self.user_id = user_id
         self.id = user_id
         self.firstname = firstname
@@ -169,6 +170,9 @@ class User(flask_login.UserMixin):
             self.role = "user"  # Default to "user"
         else:
             self.role = role
+        
+        if self.role == "admin":
+            self.managed_categories = managed_categories
 
     def __repr__(self):
         return f"{self.username} ({self.firstname} {self.lastname}) [{self.category}]"

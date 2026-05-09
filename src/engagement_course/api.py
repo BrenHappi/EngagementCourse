@@ -1,8 +1,7 @@
-from flask import Blueprint, current_app, request, abort, jsonify, flash
+from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
-from datetime import datetime
-from engagement_course.models import RaceFilter, Category, CATEGORIES, EngagementStatus
-from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
+from datetime import datetime, timedelta
+from engagement_course.models import EngagementStatus
 from pydantic import BaseModel, Field
 from engagement_course.utils import get_db
 
@@ -18,30 +17,63 @@ class UpdateEngagementPayload(BaseModel):
     status: EngagementStatus
 
 
+def _to_engagement_status(value) -> EngagementStatus | None:
+    if isinstance(value, EngagementStatus):
+        return value
+    if isinstance(value, str):
+        try:
+            return EngagementStatus(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _race_accepts_user_category(race, user_category) -> bool:
+    if not user_category or not race.categories:
+        return False
+
+    for race_category in race.categories:
+        if (
+            race_category.level == user_category.level
+            and race_category.number == user_category.number
+        ):
+            return True
+    return False
+
 @api_bp.route("/engagement", methods=["POST"])
 @login_required
 def create_engagement():
     db = get_db()
 
-    raw_json = request.get_json()
+    raw_json = request.get_json(silent=True) or {}
     try:
         payload = CreateEngagementPayload(**raw_json)
     except Exception as e:
         return jsonify({"status": "error", "message": f"Invalid payload: {e}"}), 400
 
-    form_user_id = payload.user_id
-    if form_user_id != current_user.user_id:
+    target_user = db.get_user_by_id(id=payload.user_id)
+    if target_user is None:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+
+    if target_user.user_id != current_user.user_id:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
 
     race_id = payload.race_id
     race = db.get_race_by_id(race_id)
     if race is None:
         return jsonify({"status": "error", "message": "Race not found"}), 404
-    # TODO: check if user can engage (category, date, etc.)
-    # TODO: check category compatibility (e.g., access4 trying to engage in open1)
+    
+    # Check if the user category is compatible with the race
+    if not _race_accepts_user_category(race, target_user.category):
+        return jsonify({"status": "error", "message": "User category not compatible with race"}), 400
+    
+    # Checking that the race is in less than 5 days
+    now = datetime.now()
+    if now + timedelta(days=5) > race.date:
+        return jsonify({"status": "error", "message": "Engagements are closed for this race"}), 400
 
-    status = payload.status
-    if status not in EngagementStatus.__members__.values():
+    status = _to_engagement_status(payload.status)
+    if status is None:
         return jsonify({"status": "error", "message": "Invalid status"}), 400
     if status == EngagementStatus.VALIDATED:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
@@ -86,16 +118,18 @@ def update_engagement(engagement_id):
     if engagement.user != current_user:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
     
-    current_status = engagement.status
+    current_status = _to_engagement_status(engagement.status)
+    if current_status is None:
+        return jsonify({"status": "error", "message": "Invalid engagement status"}), 400
 
-    raw_json = request.get_json()
+    raw_json = request.get_json(silent=True) or {}
     try:
         payload = UpdateEngagementPayload(**raw_json)
     except Exception as e:
         return jsonify({"status": "error", "message": f"Invalid payload: {e}"}), 400
 
-    new_status = payload.status
-    if new_status not in EngagementStatus.__members__.values():
+    new_status = _to_engagement_status(payload.status)
+    if new_status is None:
         return jsonify({"status": "error", "message": "Invalid status"}), 400
     if new_status == EngagementStatus.VALIDATED:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
@@ -120,7 +154,7 @@ def delete_engagement(engagement_id):
         return jsonify({"status": "error", "message": "Engagement not found"}), 404
     if engagement.user != current_user:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
-    if engagement.status == EngagementStatus.VALIDATED.value:
+    if _to_engagement_status(engagement.status) == EngagementStatus.VALIDATED:
         return jsonify({
             "status": "error",
             "message": "Unauthorized to delete a validated engagement"

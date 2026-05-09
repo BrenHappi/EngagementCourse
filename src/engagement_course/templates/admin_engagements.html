@@ -41,18 +41,36 @@
 				<p class="eyebrow">Sections</p>
 				<h2>Navigation rapide</h2>
 			</div>
-			<a class="button-secondary" href="{{ url_for('admin.admin') }}">Retour menu admin</a>
+			<div style="display: flex; gap: 2rem; align-items: center;">
+				{% if has_managed_categories %}
+					<label style="display: flex; align-items: center; gap: 1rem; cursor: pointer; user-select: none;">
+						<span style="font-size: 0.875rem; font-weight: 500;">Afficher uniquement mes catégories</span>
+						<div style="position: relative; width: 48px; height: 28px;">
+							<input type="checkbox" 
+								   {% if not show_all %}checked{% endif %}
+								   onchange="const url = new URL(window.location); url.searchParams.set('show_all', this.checked ? 'false' : 'true'); window.location = url.toString();"
+								   style="display: none;">
+							<a href="{{ url_for('admin.manage_engagements', status=selected_status, show_all='false' if show_all else 'true') }}"
+							   style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: {% if not show_all %}#0ea5e9{% else %}#64748b{% endif %}; border-radius: 14px; display: flex; align-items: center; padding: 2px; transition: background 0.3s; text-decoration: none; border: none;">
+								<div style="width: 24px; height: 24px; background: white; border-radius: 50%; transition: transform 0.3s; transform: translateX({% if not show_all %}22px{% else %}0{% endif %});"></div>
+							</a>
+						</div>
+					</label>
+				{% endif %}
+				<a class="button-secondary" href="{{ url_for('admin.admin') }}">Retour menu admin</a>
+			</div>
 		</div>
 		<div class="engagement-status-nav">
-			<a class="engagement-status-link {% if selected_status == 'pending' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='pending') }}">
+			{% set show_all_param = 'true' if show_all else 'false' %}
+			<a class="engagement-status-link {% if selected_status == 'pending' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='pending', show_all=show_all_param) }}">
 				<span>En attente</span>
 				<span class="chip">{{ status_counts['pending'] }}</span>
 			</a>
-			<a class="engagement-status-link {% if selected_status == 'validated' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='validated') }}">
+			<a class="engagement-status-link {% if selected_status == 'validated' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='validated', show_all=show_all_param) }}">
 				<span>Validees</span>
 				<span class="chip">{{ status_counts['validated'] }}</span>
 			</a>
-			<a class="engagement-status-link {% if selected_status == 'cancelled' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='cancelled') }}">
+			<a class="engagement-status-link {% if selected_status == 'cancelled' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements', status='cancelled', show_all=show_all_param) }}">
 				<span>Rejetees</span>
 				<span class="chip">{{ status_counts['cancelled'] }}</span>
 			</a>

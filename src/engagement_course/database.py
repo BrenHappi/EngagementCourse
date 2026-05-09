@@ -85,6 +85,7 @@ class DatabaseRepository:
                     username TEXT NOT NULL UNIQUE,
                     password TEXT NOT NULL,
                     role TEXT NOT NULL,
+                    managed_categories TEXT,
                     category_key TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
@@ -313,23 +314,55 @@ class DatabaseRepository:
             status=row["status"],
         )
 
-    
-    def list_engagements(self, status: Optional[str] = None) -> list[Engagement]:
+
+    def list_engagements(self, status: Optional[str] = None, categories: Optional[list[Category]] = None) -> list[Engagement]:
         """
         Returns a list of engagements, optionally filtered by status.
         If status is None, returns all engagements.
         
         Arguments:
         - status: optional filter to return only engagements with a specific status (e.g., "pending", "validated", "interested")
+        - categories: optional filter to return only engagements with specific categories
         Returns: a list of Engagement objects matching the criteria
         """
         engagements = []
         with self._connect() as conn:
-            query = "SELECT id, user_id, race_id, status FROM engagements"
+            query = "SELECT e.id, e.user_id, e.race_id, e.status FROM engagements AS e"
+            where_clauses = []
             params = []
+
             if status is not None:
-                query += " WHERE status = ?"
+                where_clauses.append("e.status = ?")
                 params.append(status)
+
+            if categories is not None and len(categories) > 0:
+                category_filters = []
+                for cat in categories:
+                    if cat is None:
+                        continue
+                    category_filters.append("(rc.level = ? AND rc.number = ?)")
+                    params.append(cat.level)
+                    params.append(cat.number)
+
+                if category_filters:
+                    where_clauses.append(
+                        """
+                        EXISTS (
+                            SELECT 1 FROM race_categories AS rc
+                            WHERE rc.race_id = e.race_id
+                            AND (
+                                """
+                        + " OR ".join(category_filters)
+                        +
+                        """
+                            )
+                        )
+                        """
+                    )
+
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
+
             rows = conn.execute(query, params).fetchall()
         
         for row in rows:
@@ -410,21 +443,24 @@ class DatabaseRepository:
         return engagements
 
 
-    def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None) -> int:
-        category_key = f"{category.level}_{category.number}" if category is not None else None
+    def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, managed_categories: Optional[list[Category]] = None) -> int:
+        category_key = category.to_key() if category is not None else None
+        managed_categories_keys = [c.to_key() for c in managed_categories] if managed_categories is not None else None
+
         with self._connect() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO users (email, username, password, category_key, firstname, lastname, role)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (email, username, password, category_key, managed_categories, firstname, lastname, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, firstname, lastname, role),
+                (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, managed_categories_keys, firstname, lastname, role),
             )
             return int(cursor.lastrowid)
         
 
-    def update_user(self, user_id: int, email: Optional[str]=None, username: Optional[str]=None, password: Optional[str]=None, firstname: Optional[str]=None, lastname: Optional[str]=None, role: Optional[str]=None, category: Optional[Category]=None) -> None:
-        category_key = f"{category.level}_{category.number}" if category is not None else None
+    def update_user(self, user_id: int, email: Optional[str]=None, username: Optional[str]=None, password: Optional[str]=None, firstname: Optional[str]=None, lastname: Optional[str]=None, role: Optional[str]=None, category: Optional[Category]=None, managed_categories: Optional[list[Category]] = None) -> None:
+        category_key = category.to_key() if category is not None else None
+        managed_categories_keys = ",".join([c.to_key() for c in managed_categories]) if managed_categories is not None else None
         with self._connect() as conn:
             user = self.get_user_by_id(user_id)
             if user is None:
@@ -437,14 +473,15 @@ class DatabaseRepository:
             updated_lastname = lastname if lastname is not None else user.lastname
             updated_role = role if role is not None else user.role
             updated_category_key = category_key if category_key is not None else (user.category.to_key() if user.category else None)
+            updated_managed_categories_keys = managed_categories_keys if managed_categories_keys is not None else (",".join([c.to_key() for c in user.managed_categories]) if user.managed_categories else None)
 
             conn.execute(
                 """
                 UPDATE users
-                SET email = ?, username = ?, password = ?, category_key = ?, firstname = ?, lastname = ?, role = ?
+                SET email = ?, username = ?, password = ?, category_key = ?, managed_categories = ?, firstname = ?, lastname = ?, role = ?
                 WHERE id = ?
                 """,
-                (updated_email, updated_username, updated_password_hash, updated_category_key, updated_firstname, updated_lastname, updated_role, user_id),
+                (updated_email, updated_username, updated_password_hash, updated_category_key, updated_managed_categories_keys, updated_firstname, updated_lastname, updated_role, user_id),
             )
 
 
@@ -463,7 +500,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, firstname, lastname, role
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role
                 FROM users
                 ORDER BY id
                 """
@@ -489,7 +526,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, firstname, lastname, role
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role
                 FROM users
                 WHERE id = ?
                 """,
@@ -505,6 +542,7 @@ class DatabaseRepository:
             username=row["username"],
             password_hash=row["password"],
             category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None,
             firstname=row["firstname"],
             lastname=row["lastname"],
             role=row["role"],
@@ -515,7 +553,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, firstname, lastname, role
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role
                 FROM users
                 WHERE email = ?
                 """,
@@ -531,6 +569,7 @@ class DatabaseRepository:
             username=row["username"],
             password_hash=row["password"],
             category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None,
             firstname=row["firstname"],
             lastname=row["lastname"],
             role=row["role"],
@@ -541,7 +580,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, firstname, lastname, role
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role
                 FROM users
                 WHERE username = ?
                 """,
@@ -560,4 +599,5 @@ class DatabaseRepository:
             firstname=row["firstname"],
             lastname=row["lastname"],
             role=row["role"],
+            managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None
         )

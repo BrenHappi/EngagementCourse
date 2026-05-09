@@ -1,6 +1,3 @@
-import secrets
-from os import getenv
-from dotenv import load_dotenv
 from flask import Flask
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -9,11 +6,12 @@ from engagement_course.auth import auth_bp
 from engagement_course.calendar import calendar_bp
 from engagement_course.admin import admin_bp
 from engagement_course.api import api_bp
+from engagement_course.profile import profile_bp
 from engagement_course.database import DatabaseRepository
 from engagement_course.ffc_parser import FFCParser
+from engagement_course.models import Category, CATEGORIES
 import engagement_course.config as config
 
-load_dotenv()
 lm = LoginManager()
 csrf = CSRFProtect()
 
@@ -54,6 +52,7 @@ def create_app() -> Flask:
             username="admin",
             password=config.ADMIN_PASSWORD,
             role="admin",
+            managed_categories=[Category(level, number) for level, number in CATEGORIES]
         )
 
     lm.init_app(app)
@@ -73,8 +72,6 @@ def create_app() -> Flask:
     app.register_blueprint(calendar_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
-
-    # TMP: display registration token:
-    print(f"Registration URL: {app.config['registration_token']}")
+    app.register_blueprint(profile_bp)
 
     return app
