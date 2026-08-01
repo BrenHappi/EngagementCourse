@@ -6,6 +6,8 @@
 	{% set category_filter_mode = category_filter_mode if category_filter_mode is defined else 'none' %}
 	{% set show_my_engagements = show_my_engagements if show_my_engagements is defined else (request.args.get('my_engagements') == '1') %}
 	{% set show_past_races = show_past_races if show_past_races is defined else (request.args.get('show_past') == '1') %}
+	{% set max_distance = max_distance if max_distance is defined else (request.args.get('max_distance')|int if request.args.get('max_distance') else 200) %}
+	{% set user_has_address = user_has_address if user_has_address is defined else false %}
 	{% set access_numbers = available_category_filters.get('ACCESS', []) %}
 	{% set open_numbers = available_category_filters.get('OPEN', []) %}
 
@@ -76,6 +78,30 @@
 			</label>
 		</div>
 
+		<div class="filter-bar-sep"></div>
+
+		<div class="filter-bar-group filter-bar-distance">
+			<span class="filter-bar-label">Rayon</span>
+			<div class="distance-slider-wrap {% if not user_has_address %}distance-slider-wrap-disabled{% endif %}" {% if not user_has_address %}title="Ajoutez une adresse dans votre profil pour activer ce filtre"{% endif %}>
+				<input
+					type="range"
+					name="max_distance"
+					min="30"
+					max="200"
+					step="10"
+					value="{{ max_distance }}"
+					class="distance-slider"
+					{% if not user_has_address %}disabled aria-disabled="true"{% endif %}
+					oninput="document.getElementById('distance-value').textContent = this.value + ' km'"
+					onchange="document.getElementById('filter-bar-form').submit()"
+				>
+				<span class="distance-slider-value" id="distance-value">{{ max_distance }} km</span>
+			</div>
+			{% if not user_has_address %}
+				<span class="filter-bar-hint">Ajoutez une adresse dans votre profil pour activer le filtre de distance.</span>
+			{% endif %}
+		</div>
+
 		{% if category_filter_mode == 'default' %}
 			<span class="filter-bar-hint">Filtre par défaut : votre catégorie</span>
 		{% endif %}
@@ -89,6 +115,7 @@
 					<tr>
 						<th class="col-date">Date</th>
 						<th class="col-loc">Lieu</th>
+						<th class="col-distance">Distance</th>
 						<th class="col-fed">Fédé</th>
 						<th class="col-type">Type</th>
 						<th class="col-cat">Catégories</th>
@@ -116,6 +143,13 @@
 							<td class="col-loc">
 								<span class="race-loc">{{ race.location }}</span>
 								<span class="race-dept-badge">{{ race.department }}</span>
+							</td>
+							<td class="col-distance">
+								{% if race.distance_km is not none %}
+									<span class="race-distance-value">{{ "%.1f"|format(race.distance_km) }} km</span>
+								{% else %}
+									<span class="race-distance-value race-distance-empty">—</span>
+								{% endif %}
 							</td>
 							<td class="col-fed">{{ race.federation }}</td>
 							<td class="col-type">{{ race.type }}</td>

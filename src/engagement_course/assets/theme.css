@@ -2346,6 +2346,38 @@ tbody tr:hover {
     flex-wrap: wrap;
 }
 
+.filter-bar-distance {
+    gap: 0.75rem;
+}
+
+.distance-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 260px;
+}
+
+.distance-slider-wrap-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.distance-slider-wrap-disabled .distance-slider,
+.distance-slider-wrap-disabled .distance-slider-value {
+    pointer-events: none;
+}
+
+.distance-slider {
+    width: 220px;
+    accent-color: var(--accent);
+}
+
+.distance-slider-value {
+    min-width: 64px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
 .filter-bar-label {
     font-size: 0.72rem;
     font-weight: 700;
@@ -2458,6 +2490,7 @@ tbody tr:hover {
 /* Column widths */
 .col-date { white-space: nowrap; min-width: 5rem; }
 .col-loc  { min-width: 10rem; }
+.col-distance { white-space: nowrap; min-width: 5.5rem; text-align: center; }
 .col-fed  { white-space: nowrap; }
 .col-type { white-space: nowrap; }
 .col-cat  { white-space: nowrap; }
@@ -2475,6 +2508,25 @@ tbody tr:hover {
 .race-date-val {
     color: var(--text);
     font-variant-numeric: tabular-nums;
+}
+
+.race-distance-value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5rem;
+    padding: 0.22rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(93, 107, 140, 0.12);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.race-distance-empty {
+    color: var(--muted);
+    background: rgba(93, 107, 140, 0.08);
 }
 
 .race-loc {

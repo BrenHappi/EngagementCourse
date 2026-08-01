@@ -4,6 +4,7 @@ from datetime import datetime, date
 import calendar as cal_module
 from engagement_course.models import RaceFilter, Category, CATEGORIES
 from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
+from engagement_course.distance import geocode_address, haversine_from_coordinates
 from engagement_course.utils import get_db
 
 MONTH_NAMES_FR = [
@@ -21,6 +22,12 @@ def index():
     category_filter_submitted = request.args.get("category_filter_submitted") == "1"
     show_my_engagements = request.args.get("my_engagements") == "1"
     show_past_races = request.args.get("show_past") == "1"
+
+    try:
+        max_distance = int(request.args.get("max_distance", 200))
+    except (TypeError, ValueError):
+        max_distance = 200
+    max_distance = max(30, min(200, max_distance))
 
     try:
         current_month = int(request.args.get("month", now.month))
@@ -69,6 +76,7 @@ def index():
         filter_params.append("my_engagements=1")
     if show_past_races:
         filter_params.append("show_past=1")
+    filter_params.append(f"max_distance={max_distance}")
     if category_filter_submitted:
         filter_params.append("category_filter_submitted=1")
     filter_qs = ("&" + "&".join(filter_params)) if filter_params else ""
@@ -86,9 +94,30 @@ def index():
             category=categories,
     )
     db = get_db()
+    current_user_record = db.get_user_by_id(current_user.user_id)
     races = db.search_races(filters)
     filtered_races = []
     today = date.today()
+
+    user_coordinates = None
+    user_has_address = bool(current_user_record and current_user_record.address)
+    if current_user_record and current_user_record.address:
+        if current_user_record.address_lat is None or current_user_record.address_lon is None:
+            user_coordinates = geocode_address(current_user_record.address)
+            if user_coordinates is not None:
+                db.update_user_coordinates(
+                    current_user_record.user_id,
+                    user_coordinates[0],
+                    user_coordinates[1],
+                )
+                current_user_record.address_lat = user_coordinates[0]
+                current_user_record.address_lon = user_coordinates[1]
+        else:
+            user_coordinates = (
+                float(current_user_record.address_lat),
+                float(current_user_record.address_lon),
+            )
+
     for race in races:
         race.my_engagement_id = None
         race.my_status = "none"
@@ -112,6 +141,29 @@ def index():
             continue
         if show_my_engagements and race.my_status not in {"interested", "pending", "validated"}:
             continue
+
+        if user_coordinates is not None:
+            race_coordinates = None
+            if race.location_lat is None or race.location_lon is None:
+                race_coordinates = geocode_address(race.location + " " + str(race.department))
+                if race_coordinates is not None:
+                    db.update_race_coordinates(race.id, race_coordinates[0], race_coordinates[1])
+                    race.location_lat = race_coordinates[0]
+                    race.location_lon = race_coordinates[1]
+            else:
+                race_coordinates = (float(race.location_lat), float(race.location_lon))
+
+            if race_coordinates is not None:
+                race.distance_km = haversine_from_coordinates(
+                    user_coordinates[0],
+                    user_coordinates[1],
+                    race_coordinates[0],
+                    race_coordinates[1],
+                )
+
+        if race.distance_km is not None and race.distance_km > max_distance:
+            continue
+
         filtered_races.append(race)
 
     races = filtered_races
@@ -129,6 +181,8 @@ def index():
         category_filter_mode=category_filter_mode,
         show_my_engagements=show_my_engagements,
         show_past_races=show_past_races,
+        user_has_address=user_has_address,
+        max_distance=max_distance,
         current_month=current_month,
         current_year=current_year,
         month_label=month_label,

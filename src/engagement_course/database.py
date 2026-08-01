@@ -28,6 +28,8 @@ class DatabaseRepository:
                     race_day TEXT NOT NULL,
                     date TEXT NOT NULL,
                     location TEXT NOT NULL,
+                    location_lat REAL,
+                    location_lon REAL,
                     department INTEGER NOT NULL,
                     federation TEXT NOT NULL,
                     race_type TEXT NOT NULL
@@ -88,7 +90,9 @@ class DatabaseRepository:
                     managed_categories TEXT,
                     category_key TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    address TEXT
+                    address TEXT,
+                    address_lat REAL,
+                    address_lon REAL
                 )
                 """
             )
@@ -98,6 +102,47 @@ class DatabaseRepository:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
             )
+
+            race_columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(races)").fetchall()
+            }
+            if "location_lat" not in race_columns:
+                conn.execute("ALTER TABLE races ADD COLUMN location_lat REAL")
+            if "location_lon" not in race_columns:
+                conn.execute("ALTER TABLE races ADD COLUMN location_lon REAL")
+
+            user_columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "address" not in user_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN address TEXT")
+            if "address_lat" not in user_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN address_lat REAL")
+            if "address_lon" not in user_columns:
+                conn.execute("ALTER TABLE users ADD COLUMN address_lon REAL")
+
+            if {"street", "city", "postal_code"}.intersection(user_columns):
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET address = TRIM(
+                        COALESCE(street, '')
+                        || CASE
+                            WHEN street IS NOT NULL AND (city IS NOT NULL OR postal_code IS NOT NULL) THEN ', '
+                            ELSE ''
+                        END
+                        || COALESCE(postal_code, '')
+                        || CASE
+                            WHEN postal_code IS NOT NULL AND city IS NOT NULL THEN ' '
+                            ELSE ''
+                        END
+                        || COALESCE(city, '')
+                    )
+                    WHERE address IS NULL OR address = ''
+                    """
+                )
 
 
     def replace_races(self, races: list[RaceEvent]) -> None:
@@ -110,13 +155,15 @@ class DatabaseRepository:
                     continue    # skip races without categories
                 cursor = conn.execute(
                     """
-                    INSERT INTO races (race_day, date, location, department, federation, race_type)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO races (race_day, date, location, location_lat, location_lon, department, federation, race_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         race.race_day,
                         race.date,
                         race.location,
+                        None,
+                        None,
                         race.department,
                         race.federation,
                         race.type,
@@ -137,6 +184,12 @@ class DatabaseRepository:
                         category_records,
                     )
 
+
+    def get_race_by_id(self, race_id:int) -> RaceEvent | None:
+        """
+        Returns a RaceEvent object matching the given id, or None if not found.
+        """
+        races = self.search_races(RaceFilter(id=race_id))
         if len(races) > 1:
             raise ValueError(f"Multiple races found with id {race_id}")
         return races[0] if races else None
@@ -208,6 +261,8 @@ class DatabaseRepository:
             r.race_day,
             r.date,
             r.location,
+            r.location_lat,
+            r.location_lon,
             r.department,
             r.federation,
             r.race_type,
@@ -234,6 +289,8 @@ class DatabaseRepository:
                     race_day=row["race_day"],
                     date=datetime.strptime(row["date"], "%Y-%m-%d"),
                     location=row["location"],
+                    location_lat=row["location_lat"],
+                    location_lon=row["location_lon"],
                     department=row["department"],
                     federation=row["federation"],
                     type=row["race_type"],
@@ -450,10 +507,10 @@ class DatabaseRepository:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO users (email, username, password, category_key, managed_categories, firstname, lastname, role, address)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, managed_categories_keys, firstname, lastname, role, address),
+                (email, username, hashpw(password.encode('utf-8'), gensalt()), category_key, managed_categories_keys, firstname, lastname, role, address, None, None),
             )
             return int(cursor.lastrowid)
         
@@ -476,14 +533,41 @@ class DatabaseRepository:
             updated_category_key = category_key if category_key is not None else (user.category.to_key() if user.category else None)
             updated_managed_categories_keys = managed_categories_keys if managed_categories_keys is not None else (",".join([c.to_key() for c in user.managed_categories]) if user.managed_categories else None)
             updated_address = address if address is not None else user.address
+            address_changed = updated_address != user.address
+            updated_address_lat = None if address_changed else user.address_lat
+            updated_address_lon = None if address_changed else user.address_lon
 
             conn.execute(
                 """
                 UPDATE users
-                SET email = ?, username = ?, password = ?, category_key = ?, managed_categories = ?, firstname = ?, lastname = ?, role = ?, address = ?
+                SET email = ?, username = ?, password = ?, category_key = ?, managed_categories = ?, firstname = ?, lastname = ?, role = ?, address = ?, address_lat = ?, address_lon = ?
                 WHERE id = ?
                 """,
-                (updated_email, updated_username, updated_password_hash, updated_category_key, updated_managed_categories_keys, updated_firstname, updated_lastname, updated_role, updated_address, user_id),
+                (updated_email, updated_username, updated_password_hash, updated_category_key, updated_managed_categories_keys, updated_firstname, updated_lastname, updated_role, updated_address, updated_address_lat, updated_address_lon, user_id),
+            )
+
+
+    def update_user_coordinates(self, user_id: int, address_lat: Optional[float], address_lon: Optional[float]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE users
+                SET address_lat = ?, address_lon = ?
+                WHERE id = ?
+                """,
+                (address_lat, address_lon, user_id),
+            )
+
+
+    def update_race_coordinates(self, race_id: int, location_lat: Optional[float], location_lon: Optional[float]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE races
+                SET location_lat = ?, location_lon = ?
+                WHERE id = ?
+                """,
+                (location_lat, location_lon, race_id),
             )
 
 
@@ -502,7 +586,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
                 ORDER BY id
                 """
@@ -519,6 +603,8 @@ class DatabaseRepository:
                 lastname=row["lastname"],
                 role=row["role"],
                 address=row["address"],
+                address_lat=row["address_lat"],
+                address_lon=row["address_lon"],
             )
 
             for row in rows
@@ -529,7 +615,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
                 WHERE id = ?
                 """,
@@ -549,7 +635,9 @@ class DatabaseRepository:
             firstname=row["firstname"],
             lastname=row["lastname"],
             role=row["role"],
-            address=row["address"]
+            address=row["address"],
+            address_lat=row["address_lat"],
+            address_lon=row["address_lon"]
         )
     
 
@@ -557,7 +645,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
                 WHERE email = ?
                 """,
@@ -577,7 +665,9 @@ class DatabaseRepository:
             firstname=row["firstname"],
             lastname=row["lastname"],
             role=row["role"],
-            address=row["address"]
+            address=row["address"],
+            address_lat=row["address_lat"],
+            address_lon=row["address_lon"]
         )
     
 
@@ -585,7 +675,7 @@ class DatabaseRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
                 WHERE username = ?
                 """,
@@ -605,5 +695,7 @@ class DatabaseRepository:
             lastname=row["lastname"],
             role=row["role"],
             managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None,
-            address=row["address"]
+            address=row["address"],
+            address_lat=row["address_lat"],
+            address_lon=row["address_lon"]
         )

@@ -5,6 +5,7 @@
 {% block content %}
 	{% set category_label = user.category|string if user.category else 'Non renseignée' %}
 	{% set managed_count = user.managed_categories|length if user.managed_categories else 0 %}
+	{% set address_label = user.address if user.address else 'Non renseignée' %}
 	<section class="hero profile-hero">
 		<div class="hero-grid profile-hero-grid">
 			<div>
@@ -23,6 +24,10 @@
 					<div class="stat-card">
 						<div class="stat-label">Catégorie</div>
 						<div class="stat-value stat-value-compact">{{ category_label }}</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-label">Adresse</div>
+						<div class="stat-value stat-value-compact">{{ address_label }}</div>
 					</div>
 				</div>
 			</div>
@@ -62,6 +67,10 @@
 				<div>
 					<dt>Catégorie</dt>
 					<dd>{{ category_label }}</dd>
+				</div>
+				<div>
+					<dt>Adresse</dt>
+					<dd>{{ address_label }}</dd>
 				</div>
 				<div>
 					<dt>Accès</dt>
@@ -111,6 +120,11 @@
 					<div class="field">
 						<label for="profile-category">Catégorie</label>
 						{{ profile_form.category(id="profile-category") }}
+					</div>
+
+					<div class="field field-span-2">
+						<label for="profile-address">Adresse</label>
+						{{ profile_form.address(id="profile-address", type="text", placeholder="Adresse complète") }}
 					</div>
 
 					{% if user.role == 'admin' %}

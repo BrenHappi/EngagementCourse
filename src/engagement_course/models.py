@@ -5,7 +5,6 @@ from typing import Optional
 from dataclasses import dataclass
 from bcrypt import checkpw
 import flask_login
-import requests
 
 from engagement_course.config import DATE_FORMAT
 
@@ -113,15 +112,20 @@ class RaceEvent:
         type: str,
         categories: list[Category],
         id: Optional[int] = None,
+        location_lat: Optional[float] = None,
+        location_lon: Optional[float] = None,
     ):
         self.id = id
         self.race_day = race_day
         self.date = date
         self.location = location
+        self.location_lat = location_lat
+        self.location_lon = location_lon
         self.department = department
         self.federation = federation
         self.type = type
         self.categories = categories
+        self.distance_km: Optional[float] = None
         # engagements
         self.engagements: list[Engagement] = []
         self.validated_users: list[User] = []
@@ -148,43 +152,6 @@ class RaceFilter:
     category: Optional[list[Category]] = None
 
 
-class Address:
-    address: str
-    coordinates: tuple[float, float]
-    
-    def __init__(self, address: str):
-        self.address = address
-        self.coordinates = self.get_coordinates()
-
-    def __repr__(self):
-        return f"Address(address='{self.address}', coordinates={self.coordinates})"
-
-    def get_coordinates(self) -> tuple[float, float] | None:
-        """
-        Fetches the coordinates (latitude, longitude) for the given address using the FR Geo API.
-        Returns:
-            A tuple of (latitude, longitude) if found, otherwise None.
-        """
-        url = "https://data.geopf.fr/geocodage/search"
-        params = {
-            "q": self.address,
-            "autocomplete": 1,
-            "returntruegeometry": "false",
-            "limit": 1
-        }
-        try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            if data.get("features"):
-                lat = float(data["features"][0]["geometry"]["coordinates"][1])
-                lon = float(data["features"][0]["geometry"]["coordinates"][0])
-                return (lat, lon)
-        except requests.RequestException as e:
-            print(f"Error fetching coordinates: {e}")
-        return None
-
-
 class User(flask_login.UserMixin):
     user_id: int
     firstname: str
@@ -196,8 +163,10 @@ class User(flask_login.UserMixin):
     role: str
     managed_categories: Optional[list[Category]] = None
     address: Optional[str] = None
+    address_lat: Optional[float] = None
+    address_lon: Optional[float] = None
 
-    def __init__(self, email: str, username: str, password_hash: bytes, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, managed_categories: Optional[list[Category]] = None, user_id: Optional[int] = None, address: Optional[str] = None):
+    def __init__(self, email: str, username: str, password_hash: bytes, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, managed_categories: Optional[list[Category]] = None, user_id: Optional[int] = None, address: Optional[str] = None, address_lat: Optional[float] = None, address_lon: Optional[float] = None):
         self.user_id = user_id
         self.id = user_id
         self.firstname = firstname
@@ -207,6 +176,8 @@ class User(flask_login.UserMixin):
         self.password_hash = password_hash
         self.category = category
         self.address = address
+        self.address_lat = address_lat
+        self.address_lon = address_lon
         if role not in USER_ROLES.values():
             self.role = "user"  # Default to "user"
         else:
