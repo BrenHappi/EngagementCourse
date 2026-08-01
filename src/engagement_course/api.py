@@ -97,13 +97,42 @@ def get_engagement(engagement_id):
             }), 404
     if engagement.user != current_user:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
+    
+    return jsonify({
+        "status": "success",
+        "engagement": {
+            "id": engagement.id,
+            "user_id": engagement.user.user_id,
+            "race_id": engagement.race.race_id,
+            "status": engagement.status.name
+        }
+    }), 200
+
+
+@api_bp.route("/engagement/user/<int:user_id>", methods=["GET"])
+@login_required
+def get_user_engagements(user_id):
+    db = get_db()
+    engagements = db.list_engagements(user_id)
+    if not engagements:
+        return jsonify({
+            "status": "error",
+            "message": "No engagements found for this user"
+            }), 404
+    if user_id != current_user.user_id:
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
 
     return jsonify({
         "status": "success",
-        "id": engagement.id,
-        "user_id": engagement.user.user_id,
-        "race_id": engagement.race.race_id,
-        "status": engagement.status.name
+        "engagements": [
+            {
+                "id": engagement.id,
+                "user_id": engagement.user.user_id,
+                "race_id": engagement.race.race_id,
+                "status": engagement.status.name
+            }
+            for engagement in engagements
+        ]
     }), 200
 
 

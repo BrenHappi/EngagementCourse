@@ -315,12 +315,13 @@ class DatabaseRepository:
         )
 
 
-    def list_engagements(self, status: Optional[str] = None, categories: Optional[list[Category]] = None) -> list[Engagement]:
+    def list_engagements(self, user_id: Optional[int] = None, status: Optional[str] = None, categories: Optional[list[Category]] = None) -> list[Engagement]:
         """
         Returns a list of engagements, optionally filtered by status.
         If status is None, returns all engagements.
         
         Arguments:
+        - user_id: optional filter to return only engagements for a specific user
         - status: optional filter to return only engagements with a specific status (e.g., "pending", "validated", "interested")
         - categories: optional filter to return only engagements with specific categories
         Returns: a list of Engagement objects matching the criteria
@@ -330,6 +331,10 @@ class DatabaseRepository:
             query = "SELECT e.id, e.user_id, e.race_id, e.status FROM engagements AS e"
             where_clauses = []
             params = []
+
+            if user_id is not None:
+                where_clauses.append("e.user_id = ?")
+                params.append(user_id)
 
             if status is not None:
                 where_clauses.append("e.status = ?")

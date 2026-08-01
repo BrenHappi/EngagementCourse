@@ -11,15 +11,15 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 - ~~S'inscrire sur une course~~
 - ~~définir une limite de temps pour la demande d'engagement (5 jours)~~
 - ajouter une course manuellement
-- pagination courses / découpage semaine, 1 mois, 3 mois
+~~- pagination courses / découpage semaine, 1 mois, 3 mois~~
 
 
 **Mon profil**
 ~~- Update ses infos perso (toutes ?)~~
 ~~- Changer son mot de passe~~
-- Supprimer son compte ?
+~~- Supprimer son compte ?~~
 
-En +: visualiser les courses sur lesquelles on est inscrit ? (ajouter un filtre?)
+~~En +: visualiser les courses sur lesquelles on est inscrit ? (ajouter un filtre?)~~
 
 
 ### Administration
@@ -44,9 +44,9 @@ En +: visualiser les courses sur lesquelles on est inscrit ? (ajouter un filtre?
 - rendre home.html déclaratif, déplacer les règles de calcul dans Python, conserver le comportement actuel.
 
 ### V2
-1. Profil utilisateur
+~~1. Profil utilisateur~~
 2. Parser le détail des courses
-3. Add filters: Filtrer les courses sur les inscrits, filtrer sur mes courses
+~~3. Add filters: Filtrer les courses sur les inscrits, filtrer sur mes courses~~
 4. Reset de mot de passe / envoyer un lien de réinitialisation de mot de passe
 
 ### V3

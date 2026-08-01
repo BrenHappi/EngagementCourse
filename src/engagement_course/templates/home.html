@@ -2,407 +2,191 @@
 
 {% block content %}
 	{% set selected_departments = request.args.getlist('department') %}
-	{% set requested_categories = request.args.getlist('category') %}
 	{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
-	{% set category_filter_mode = category_filter_mode if category_filter_mode is defined else ('explicit' if requested_categories else 'none') %}
+	{% set category_filter_mode = category_filter_mode if category_filter_mode is defined else 'none' %}
+	{% set show_my_engagements = show_my_engagements if show_my_engagements is defined else (request.args.get('my_engagements') == '1') %}
+	{% set show_past_races = show_past_races if show_past_races is defined else (request.args.get('show_past') == '1') %}
 	{% set access_numbers = available_category_filters.get('ACCESS', []) %}
 	{% set open_numbers = available_category_filters.get('OPEN', []) %}
-	{% set visible_department_count = selected_departments|length if selected_departments else available_departments|length %}
-	{% set department_scope_label = 'Filtrés' if selected_departments else 'Tous visibles' %}
-	{% set total_category_count = namespace(value=0) %}
-	{% for level, numbers in available_category_filters.items() %}
-		{% set total_category_count.value = total_category_count.value + numbers|length %}
-	{% endfor %}
-	{% set visible_category_count = selected_categories|length if selected_categories else total_category_count.value %}
-	{% set category_scope_label = 'Filtrées' if category_filter_mode == 'explicit' else ('Par défaut' if category_filter_mode == 'default' else 'Toutes visibles') %}
-	{% set explicit_date_from = request.args.get('date_from', '') %}
-	{% set explicit_date_to = request.args.get('date_to', '') %}
-	{% set active_filter_count = selected_departments|length + selected_categories|length + (1 if explicit_date_from else 0) + (1 if explicit_date_to else 0) %}
-	{% set hero_group_photo = 'groupe_large.jpg' %}
-	{% if selected_categories %}
-		{% if 'ACCESS_1' in selected_categories or 'ACCESS_2' in selected_categories %}
-			{% set hero_group_photo = 'groupe_A1_A2.jpg' %}
-		{% elif 'ACCESS_3' in selected_categories or 'ACCESS_4' in selected_categories %}
-			{% set hero_group_photo = 'groupe_A3_A4.jpg' %}
-		{% endif %}
-	{% endif %}
 
-	<section class="hero">
-		<div class="hero-grid">
-			<div>
-				<p class="eyebrow">Courses</p>
-				<h1>Calendrier route</h1>
-				<p class="hero-copy">{{ username }}</p>
-				<div class="stats-grid">
-					<div class="stat-card">
-						<div class="stat-label">Courses visibles</div>
-						<div class="stat-value">{{ races|length }}</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-label">Catégories visibles</div>
-						<div class="stat-value">{{ visible_category_count }}</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-label">Date de depart</div>
-						<div class="stat-value">{{ explicit_date_from or now }}</div>
-					</div>
-				</div>
-			</div>
-			<div class="hero-brand">
-				<img class="hero-brand-photo" src="{{ url_for('static', filename=hero_group_photo) }}" alt="Photo de groupe du club">
-				<img class="hero-brand-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-				<img class="hero-brand-hermine" src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
-				<div class="hero-brand-content">
-					<p class="eyebrow">ASPTT Bretagne</p>
-					<p class="hero-brand-title">Route</p>
-					<div class="hero-brand-meta metric-inline">
-						<span class="chip">{{ available_departments|length }} dep.</span>
-						<span class="chip">{{ races|length }} courses</span>
-						<span class="chip">Photo groupe</span>
-					</div>
-				</div>
-			</div>
+	{# ── Page header + month nav ─────────────────────────────────────── #}
+	<div class="cal-header">
+		<div class="cal-header-left">
+			<p class="eyebrow">Calendrier</p>
+			<h1 class="cal-title">Courses</h1>
 		</div>
-	</section>
+		<div class="cal-month-nav">
+			<a class="cal-nav-btn" href="{{ prev_url }}" aria-label="Mois précédent">&#8592;</a>
+			<span class="cal-month-label">{{ month_label }}</span>
+			<a class="cal-nav-btn" href="{{ next_url }}" aria-label="Mois suivant">&#8594;</a>
+		</div>
+		<div class="cal-header-right">
+			<span class="chip">{{ races|length }} course{% if races|length != 1 %}s{% endif %}</span>
+			<a class="button-ghost button-sm" href="{{ url_for('calendar.index', reset=1) }}">Réinitialiser</a>
+		</div>
+	</div>
 
-	<div class="content-grid">
-		<aside class="panel panel-sticky filter-panel">
-			<div class="filter-panel-header">
-				<div>
-					<p class="eyebrow">Filtres</p>
-					<h2>Filtres</h2>
-				</div>
-				<div class="filter-panel-meta">
-					<span class="chip">{{ active_filter_count }} actif{% if active_filter_count > 1 %}s{% endif %}</span>
-					<span class="chip">{{ available_departments|length }} dep.</span>
-					<span class="chip">{{ visible_category_count }} cat.</span>
-				</div>
-			</div>
+	{# ── Compact filter bar ──────────────────────────────────────────── #}
+	<form method="get" action="{{ url_for('calendar.index') }}" class="filter-bar" id="filter-bar-form">
+		<input type="hidden" name="category_filter_submitted" value="1">
+		<input type="hidden" name="month" value="{{ current_month }}">
+		<input type="hidden" name="year" value="{{ current_year }}">
 
-			<form method="get" action="{{ url_for('calendar.index') }}" class="filter-form-compact">
-				<input type="hidden" name="category_filter_submitted" value="1">
-				<fieldset class="field-block full filter-group">
-					<legend class="filter-group-header">
-						<span>Départements</span>
-						<div class="filter-group-header-meta">
-							<span class="filter-group-scope">{{ department_scope_label }}</span>
-							<span class="filter-summary-count">{{ visible_department_count }}</span>
-						</div>
-					</legend>
-					<div class="checkbox-grid checkbox-grid-compact">
-						{% for dept in available_departments %}
-							<label class="checkbox-pill checkbox-pill-compact">
-								<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}>
-								<span>{{ dept }}</span>
-							</label>
-						{% endfor %}
-					</div>
-				</fieldset>
+		<div class="filter-bar-group">
+			<span class="filter-bar-label">Dép.</span>
+			{% for dept in available_departments %}
+				<label class="chip chip-toggle {% if dept|string in selected_departments %}chip-toggle-active{% endif %}">
+					<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
+					{{ dept }}
+				</label>
+			{% endfor %}
+		</div>
 
-				<fieldset class="field-block full filter-group">
-					<legend class="filter-group-header">
-						<span>Catégories</span>
-						<div class="filter-group-header-meta">
-							<span class="filter-group-scope">{{ category_scope_label }}</span>
-							<span class="filter-summary-count">{{ visible_category_count }}</span>
-						</div>
-					</legend>
-					<div class="filter-category-groups filter-scroll-area">
-						<div class="filter-category-block filter-category-block-primary">
-							<div class="filter-category-title-row">
-								<span class="filter-category-title">ACCESS</span>
-								<span class="filter-category-count">{{ access_numbers|length }}</span>
-							</div>
-							<div class="checkbox-grid checkbox-grid-compact checkbox-grid-categories">
-								{% for num in access_numbers %}
-									{% set key = 'ACCESS_' ~ num %}
-									<label class="checkbox-pill checkbox-pill-compact checkbox-pill-category-access">
-										<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
-										<span>ACCESS {{ num }}</span>
-									</label>
-								{% endfor %}
-							</div>
-						</div>
-						<div class="filter-category-block">
-							<div class="filter-category-title-row">
-								<span class="filter-category-title">OPEN</span>
-								<span class="filter-category-count">{{ open_numbers|length }}</span>
-							</div>
-							<div class="checkbox-grid checkbox-grid-compact checkbox-grid-categories">
-								{% for num in open_numbers %}
-									{% set key = 'OPEN_' ~ num %}
-									<label class="checkbox-pill checkbox-pill-compact">
-										<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %}>
-										<span>OPEN {{ num }}</span>
-									</label>
-								{% endfor %}
-							</div>
-						</div>
-					</div>
-				</fieldset>
+		<div class="filter-bar-sep"></div>
 
-				<div class="field-grid filter-group filter-group-dates">
-					<div class="field">
-						<label for="date_from">Du</label>
-						<input id="date_from" name="date_from" type="text" placeholder="{{ now }}" value="{{ explicit_date_from }}">
-					</div>
-					<div class="field">
-						<label for="date_to">Au</label>
-						<input id="date_to" name="date_to" type="text" placeholder="30/05/2026" value="{{ explicit_date_to }}">
-					</div>
-				</div>
+		<div class="filter-bar-group">
+			<span class="filter-bar-label">Cat.</span>
+			{% for num in access_numbers %}
+				{% set key = 'ACCESS_' ~ num %}
+				<label class="chip chip-toggle chip-toggle-access {% if key in selected_categories %}chip-toggle-active{% endif %}">
+					<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
+					A{{ num }}
+				</label>
+			{% endfor %}
+			{% for num in open_numbers %}
+				{% set key = 'OPEN_' ~ num %}
+				<label class="chip chip-toggle {% if key in selected_categories %}chip-toggle-active{% endif %}">
+					<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
+					O{{ num }}
+				</label>
+			{% endfor %}
+		</div>
 
-				<div class="form-actions filter-actions">
-					<button type="submit">Appliquer</button>
-					<a class="button button-ghost" href="{{ url_for('calendar.index', reset=1) }}">Réinitialiser</a>
-				</div>
-			</form>
-		</aside>
+		<div class="filter-bar-sep"></div>
 
-		<section class="panel panel-stack">
-			<div class="panel-title-row">
-				<div>
-					<p class="eyebrow">Résultats</p>
-					<h2>Liste des courses</h2>
-				</div>
-				<div class="chip-row">
-					<span class="chip" id="race-visible-count" data-total-count="{{ races|length }}">{{ races|length }} résultat{% if races|length > 1 %}s{% endif %}</span>
-					{% if selected_categories %}
-						<span class="chip">{{ selected_categories|join(', ') }}</span>
-					{% endif %}
-				</div>
-			</div>
+		<div class="filter-bar-group">
+			<span class="filter-bar-label">Vue</span>
+			<label class="chip chip-toggle {% if show_my_engagements %}chip-toggle-active{% endif %}">
+				<input type="checkbox" name="my_engagements" value="1" {% if show_my_engagements %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
+				Mes courses
+			</label>
+			<label class="chip chip-toggle {% if show_past_races %}chip-toggle-active{% endif %}">
+				<input type="checkbox" name="show_past" value="1" {% if show_past_races %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
+				Afficher passees
+			</label>
+		</div>
 
-			{% if races %}
-				<div class="race-search-row field">
-					<label for="race_search">Rechercher une course</label>
-					<input id="race_search" type="text" placeholder="Rechercher une course par lieu ..." autocomplete="off">
-				</div>
-			{% endif %}
+		{% if category_filter_mode == 'default' %}
+			<span class="filter-bar-hint">Filtre par défaut : votre catégorie</span>
+		{% endif %}
+	</form>
 
-			{% if races %}
-				<ul class="race-grid">
+	{# ── Race table ──────────────────────────────────────────────────── #}
+	{% if races %}
+		<div class="race-table-wrap">
+			<table class="race-table">
+				<thead>
+					<tr>
+						<th class="col-date">Date</th>
+						<th class="col-loc">Lieu</th>
+						<th class="col-fed">Fédé</th>
+						<th class="col-type">Type</th>
+						<th class="col-cat">Catégories</th>
+						<th class="col-pax" title="Inscrits / En attente / Intéressés">Participants</th>
+						<th class="col-status">Statut</th>
+						<th class="col-actions">Actions</th>
+					</tr>
+				</thead>
+				<tbody>
 					{% for race in races %}
-						{% set interested_users = race.interested_users if race.interested_users is defined else [] %}
-						{% set pending_users = race.pending_users if race.pending_users is defined else [] %}
-						{% set validated_users = race.validated_users if race.validated_users is defined else [] %}
-						{% set interested_count = race.interested_count if race.interested_count is defined else interested_users|length %}
-						{% set pending_count = race.pending_count if race.pending_count is defined else pending_users|length %}
-						{% set validated_count = race.validated_count if race.validated_count is defined else validated_users|length %}
 						{% set my_status = race.my_status if race.my_status is defined else '' %}
 						{% set my_engagement_id = race.my_engagement_id if race.my_engagement_id is defined else none %}
 						{% set is_engaged = my_status in ['pending', 'validated'] %}
-						{% set selection_state = 'interested' if my_status == 'interested' else ('pending' if is_engaged else 'none') %}
-						{% set card_status = my_status if my_status else 'none' %}
-						<li class="race-item" id="race-{{ race.id }}" data-search-text="{{ race.location|lower }}">
-							<div class="race-card-shell race-card-shell-{{ card_status }}">
-								<div class="race-card" data-modal-id="race-modal-{{ loop.index0 }}" role="button" tabindex="0">
-									<div class="race-card-left race-card-left-{{ card_status }}">
-										<div class="race-place-row">
-											<p class="race-title">{{ race.location }}</p>
-											<span class="race-department-chip">{{ race.department }}</span>
-										</div>
-										<p class="race-event-line">
-											<span class="race-meta-pill">
-												<span class="race-meta-label">Date</span>
-												{{ race.race_day }} {{ race.display_date() }}
-											</span>
-										</p>
-										<div class="race-event-meta-row">
-											<span class="race-meta-pill">
-												<span class="race-meta-label">Fédé</span>
-												{{ race.federation }}
-											</span>
-											<span class="race-meta-pill">
-												<span class="race-meta-label">Type</span>
-												{{ race.type }}
-											</span>
-										</div>
-										<div class="race-category-tags">
-											{% if race.categories %}
-												{% for category in race.categories %}
-													<span class="race-category-tag">{{ category.level }} {{ category.number }}</span>
-												{% endfor %}
-											{% else %}
-												<span class="race-category-tag race-category-tag-empty">Aucune catégorie</span>
-											{% endif %}
-										</div>
-									</div>
-									<div class="race-card-right">
-										<div class="race-status-pill race-status-pill-{{ card_status }}">
-											<span class="status-dot status-dot-{{ my_status if my_status else 'none' }}"></span>
-											{% if my_status == 'validated' %}demande validée{% elif my_status == 'pending' %}demande en attente{% elif my_status == 'interested' %}intéressé{% elif my_status == 'cancelled' %}demande annulée{% else %}aucun statut{% endif %}
-										</div>
-										{% if validated_count > 0 or pending_count > 0 or interested_count > 0 %}
-											<div class="race-counters-row">
-												{% if validated_count > 0 %}
-													<div class="race-counter race-counter-validated" tabindex="0">
-														<span>{{ validated_count }} inscrit{% if validated_count > 1 %}s{% endif %}</span>
-														<div class="race-counter-popover">
-															<ul>{% for user in validated_users %}<li>{{ user }}</li>{% endfor %}</ul>
-														</div>
-													</div>
-												{% endif %}
-												{% if pending_count > 0 %}
-													<div class="race-counter race-counter-pending" tabindex="0">
-														<span>{{ pending_count }} en attente</span>
-														<div class="race-counter-popover">
-															<ul>{% for user in pending_users %}<li>{{ user }}</li>{% endfor %}</ul>
-														</div>
-													</div>
-												{% endif %}
-												{% if interested_count > 0 %}
-													<div class="race-counter race-counter-interested" tabindex="0">
-														<span>{{ interested_count }} intéressé{% if interested_count > 1 %}s{% endif %}</span>
-														<div class="race-counter-popover">
-															<ul>{% for user in interested_users %}<li>{{ user }}</li>{% endfor %}</ul>
-														</div>
-													</div>
-												{% endif %}
-											</div>
-										{% endif %}
-										<div class="race-card-actions">
-											{% if my_status == 'validated' %}
-												<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="PATCH" style="width: 100%;">
-													<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-													<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-													<input type="hidden" name="race_id" value="{{ race.id }}">
-													<button type="submit" name="status" value="cancelled" class="button-danger" style="width: 100%;">Annuler participation</button>
-												</form>
-											{% elif my_status == 'cancelled' %}
-												<div style="color: var(--muted); font-size: 0.9em;">Participation annulée. Les inscrits restent visibles.</div>
-											{% else %}
-												<div style="display: flex; align-items: center; gap: 0.5rem; width: 100%;">
-													<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="flex: 1;">
-														<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-														<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-														<input type="hidden" name="race_id" value="{{ race.id }}">
-														<button type="submit" name="status" value="interested" class="button-secondary engagement-radio {% if my_status == 'interested' %}is-active{% endif %}" style="width: 100%;">Intéressé</button>
-													</form>
-													<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="flex: 1;">
-														<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-														<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-														<input type="hidden" name="race_id" value="{{ race.id }}">
-														<button type="submit" name="status" value="pending" class="engagement-radio {% if is_engaged %}is-active{% endif %}" style="width: 100%;">Demande d'inscription</button>
-													</form>
-													{% if my_engagement_id %}
-														<form method="post" action="{{ url_for('api.delete_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="DELETE">
-															<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-															<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-															<input type="hidden" name="race_id" value="{{ race.id }}">
-															<button type="submit" class="button-icon" aria-label="Annuler l'engagement" title="Annuler" style="padding: 0.5rem; font-size: 1.2em; flex-shrink: 0; background: none; border: none; cursor: pointer;">🚫</button>
-														</form>
-													{% endif %}
-												</div>
-											{% endif %}
-										</div>
-										<div class="race-meta">Cliquer sur la carte pour voir les détails complets de la course.</div>
-									</div>
-								</div>
-							</div>
-						</li>
+						{% set validated_users = race.validated_users if race.validated_users is defined else [] %}
+						{% set pending_users = race.pending_users if race.pending_users is defined else [] %}
+						{% set interested_users = race.interested_users if race.interested_users is defined else [] %}
+						{% set vc = validated_users|length %}
+						{% set pc = pending_users|length %}
+						{% set ic = interested_users|length %}
+						<tr class="race-row race-row-{{ my_status if my_status else 'none' }}" id="race-{{ race.id }}">
+							<td class="col-date">
+								<span class="race-date-day">{{ race.race_day[:3] }}</span>
+								<span class="race-date-val">{{ race.display_date() }}</span>
+							</td>
+							<td class="col-loc">
+								<span class="race-loc">{{ race.location }}</span>
+								<span class="race-dept-badge">{{ race.department }}</span>
+							</td>
+							<td class="col-fed">{{ race.federation }}</td>
+							<td class="col-type">{{ race.type }}</td>
+							<td class="col-cat">
+								{% if race.categories %}
+									{% for cat in race.categories %}
+										<span class="cat-tag" title="{{ cat.level }} {{ cat.number }}">{{ cat.level[0] }}{{ cat.number }}</span>
+									{% endfor %}
+								{% else %}
+									<span class="cat-tag cat-tag-empty">—</span>
+								{% endif %}
+							</td>
+							<td class="col-pax">
+								{% if vc > 0 %}
+									<span class="pax-chip pax-validated" tabindex="0">✓{{ vc }}<span class="pax-popover"><ul>{% for u in validated_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
+								{% endif %}
+								{% if pc > 0 %}
+									<span class="pax-chip pax-pending" tabindex="0">⏳{{ pc }}<span class="pax-popover"><ul>{% for u in pending_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
+								{% endif %}
+								{% if ic > 0 %}
+									<span class="pax-chip pax-interested" tabindex="0">★{{ ic }}<span class="pax-popover"><ul>{% for u in interested_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
+								{% endif %}
+								{% if vc == 0 and pc == 0 and ic == 0 %}
+									<span class="pax-none">—</span>
+								{% endif %}
+							</td>
+							<td class="col-status">
+								<span class="status-dot status-dot-{{ my_status if my_status else 'none' }}" title="{{ my_status if my_status else 'aucun statut' }}"></span>
+							</td>
+							<td class="col-actions">
+								{% if my_status == 'validated' %}
+									<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="PATCH">
+										<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+										<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+										<input type="hidden" name="race_id" value="{{ race.id }}">
+										<button type="submit" name="status" value="cancelled" class="action-btn action-btn-cancel" title="Annuler participation">✕</button>
+									</form>
+								{% elif my_status == 'cancelled' %}
+									<span class="action-btn-disabled" title="Annulé">—</span>
+								{% else %}
+									<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="display:contents">
+										<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+										<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+										<input type="hidden" name="race_id" value="{{ race.id }}">
+										<button type="submit" name="status" value="interested" class="action-btn action-btn-star {% if my_status == 'interested' %}action-btn-active{% endif %}" title="Intéressé">★</button>
+										<button type="submit" name="status" value="pending" class="action-btn action-btn-plus {% if is_engaged %}action-btn-active{% endif %}" title="Demande d'inscription">+</button>
+									</form>
+									{% if my_engagement_id %}
+										<form method="post" action="{{ url_for('api.delete_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="DELETE" style="display:contents">
+											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+											<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+											<input type="hidden" name="race_id" value="{{ race.id }}">
+											<button type="submit" class="action-btn action-btn-cancel" title="Supprimer l'engagement">✕</button>
+										</form>
+									{% endif %}
+								{% endif %}
+							</td>
+						</tr>
 					{% endfor %}
-				</ul>
-				<div id="race-search-empty-state" class="empty-state" hidden>Aucune course ne correspond à cette recherche.</div>
-			{% else %}
-				<div class="empty-state">Aucune course ne correspond aux filtres actuels.</div>
-			{% endif %}
-		</section>
-	</div>
+				</tbody>
+			</table>
+		</div>
+	{% else %}
+		<div class="empty-state">Aucune course ce mois-ci avec les filtres actuels.</div>
+	{% endif %}
 
-{% for race in races %}
-	{% set my_status = race.my_status if race.my_status is defined else '' %}
-	{% set my_engagement_id = race.my_engagement_id if race.my_engagement_id is defined else none %}
-<dialog id="race-modal-{{ loop.index0 }}">
-<article class="modal-card">
-<div class="modal-body panel-stack">
-<p>DETAIL DE LA COURSE, A VENIR</p>
-<div class="form-actions">
-	<button type="button" class="button-secondary close-modal">Fermer</button>
-</div>
-			</div>
-		</article>
-	</dialog>
-{% endfor %}
 {% endblock %}
 
 {% block scripts %}
 	<script>
 		(function () {
-			function openDialog(dialog) {
-				if (!dialog) {
-					return;
-				}
-
-				if (typeof dialog.showModal === "function") {
-					dialog.showModal();
-				} else {
-					dialog.setAttribute("open", "open");
-				}
-			}
-
-			function closeDialog(dialog) {
-				if (!dialog) {
-					return;
-				}
-
-				if (typeof dialog.close === "function") {
-					dialog.close();
-				} else {
-					dialog.removeAttribute("open");
-				}
-			}
-
-			document.addEventListener("click", function (event) {
-				var closeButton = event.target.closest("dialog .close-modal");
-				if (closeButton) {
-					closeDialog(closeButton.closest("dialog"));
-					return;
-				}
-
-				var card = event.target.closest(".race-card");
-				if (!card) {
-					return;
-				}
-
-				if (event.target.closest("form, button, a, input, select, textarea")) {
-					return;
-				}
-
-				var modalId = card.getAttribute("data-modal-id");
-				openDialog(document.getElementById(modalId));
-			});
-
-			document.addEventListener("keydown", function (event) {
-				var card = event.target.closest(".race-card");
-				if (!card) {
-					return;
-				}
-
-				if (event.key !== "Enter" && event.key !== " ") {
-					return;
-				}
-
-				event.preventDefault();
-				var modalId = card.getAttribute("data-modal-id");
-				openDialog(document.getElementById(modalId));
-			});
-
-			document.querySelectorAll("dialog").forEach(function (dialog) {
-				dialog.addEventListener("click", function (event) {
-					var rect = dialog.getBoundingClientRect();
-					var isInDialog =
-						rect.top <= event.clientY &&
-						event.clientY <= rect.top + rect.height &&
-						rect.left <= event.clientX &&
-						event.clientX <= rect.left + rect.width;
-
-					if (!isInDialog) {
-						closeDialog(dialog);
-					}
-				});
-			});
-
 			function getCsrfToken(form) {
 				var csrfInput = form.querySelector('input[name="csrf_token"]');
 				return csrfInput ? csrfInput.value : "";
@@ -416,17 +200,15 @@
 				};
 
 				var response = await fetch(url, {
-					method: method,
-					body: method === "DELETE" ? null : JSON.stringify(payload),
-					headers: headers
-				});
+method: method,
+body: method === "DELETE" ? null : JSON.stringify(payload),
+headers: headers
+});
 
 				var data = null;
 				try {
 					data = await response.json();
-				} catch (e) {
-					// Response is not JSON, ignore.
-				}
+				} catch (e) {}
 
 				return { ok: response.ok, status: response.status, data: data };
 			}
@@ -438,45 +220,10 @@
 				return "Une erreur est survenue";
 			}
 
-			function normalizeSearchValue(value) {
-				return (value || "")
-					.toLowerCase()
-					.normalize("NFD")
-					.replace(/[\u0300-\u036f]/g, "")
-					.trim();
-			}
-
-			function applyRaceSearchFilter(rawValue) {
-				var query = normalizeSearchValue(rawValue);
-				var visibleCount = 0;
-
-				document.querySelectorAll(".race-item").forEach(function (item) {
-					var searchableText = normalizeSearchValue(item.getAttribute("data-search-text") || item.textContent);
-					var isVisible = !query || searchableText.includes(query);
-					item.classList.toggle("race-item-hidden", !isVisible);
-					item.setAttribute("aria-hidden", isVisible ? "false" : "true");
-					if (isVisible) {
-						visibleCount += 1;
-					}
-				});
-
-				var countChip = document.getElementById("race-visible-count");
-				if (countChip) {
-					countChip.textContent = visibleCount + " résultat" + (visibleCount > 1 ? "s" : "");
-				}
-
-				var searchEmptyState = document.getElementById("race-search-empty-state");
-				if (searchEmptyState) {
-					searchEmptyState.hidden = visibleCount !== 0;
-				}
-			}
-
 			async function handleEngagementSubmit(form, submitter) {
 				var apiMethod = (form.dataset.apiMethod || "POST").toUpperCase();
 				var button = submitter || form.querySelector('button[type="submit"]');
-				if (!button) {
-					return;
-				}
+				if (!button) return;
 
 				button.disabled = true;
 
@@ -484,17 +231,13 @@
 					var payload = null;
 
 					if (apiMethod === "POST") {
-						var statusValue = submitter && submitter.name === "status" ? submitter.value : "";
-						var userIdInput = form.querySelector('input[name="user_id"]');
-						var raceIdInput = form.querySelector('input[name="race_id"]');
 						payload = {
-							user_id: userIdInput ? Number(userIdInput.value) : null,
-							race_id: raceIdInput ? Number(raceIdInput.value) : null,
-							status: statusValue
+							user_id: Number(form.querySelector('input[name="user_id"]').value),
+							race_id: Number(form.querySelector('input[name="race_id"]').value),
+							status: submitter && submitter.name === "status" ? submitter.value : ""
 						};
 					} else if (apiMethod === "PATCH") {
-						var patchStatus = submitter && submitter.name === "status" ? submitter.value : "";
-						payload = { status: patchStatus };
+						payload = { status: submitter && submitter.name === "status" ? submitter.value : "" };
 					}
 
 					var result = await apiCall(apiMethod, form.action, payload, getCsrfToken(form));
@@ -513,23 +256,11 @@
 			}
 
 			document.addEventListener("submit", function (event) {
-				var form = event.target;
-				if (!form || form.dataset.engagementForm !== "true") {
-					return;
-				}
-
+var form = event.target;
+				if (!form || form.dataset.engagementForm !== "true") return;
 				event.preventDefault();
-				
 				handleEngagementSubmit(form, event.submitter);
 			});
-
-			var raceSearchInput = document.getElementById("race_search");
-			if (raceSearchInput) {
-				raceSearchInput.addEventListener("input", function () {
-					applyRaceSearchFilter(raceSearchInput.value);
-				});
-				applyRaceSearchFilter(raceSearchInput.value);
-			}
 		})();
 	</script>
 {% endblock %}
