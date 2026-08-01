@@ -35,6 +35,7 @@ def create_app() -> Flask:
     csrf.init_app(app)
     db = DatabaseRepository()
     app.config["repository"] = db
+    app.config["external_url"] = config.EXTERNAL_URL
     app.config['registration_token'] = config.REGISTRATION_TOKEN
 
     try:
@@ -52,7 +53,11 @@ def create_app() -> Flask:
             username="admin",
             password=config.ADMIN_PASSWORD,
             role="admin",
-            managed_categories=[Category(level, number) for level, number in CATEGORIES]
+            managed_categories=[
+                Category(level, number)
+                for level, numbers in CATEGORIES.items()
+                for number in numbers
+            ]
         )
 
     lm.init_app(app)

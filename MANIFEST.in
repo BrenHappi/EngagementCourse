@@ -1,0 +1,2 @@
+recursive-include src/engagement_course/templates *.html
+recursive-include src/engagement_course/assets *.css *.png *.jpg *.jpeg *.webp *.svg

@@ -4,6 +4,8 @@ ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="admin"
 SECRET_KEY = "121c4bcdfa653bb27efdd69fb41681b5"
 
+EXTERNAL_URL = "http://localhost:8000"
+
 FFC_CALENDAR_URLS = {
     22: "https://www.cyclisme-amateur.com/courses-cotes-d-armor.html",
     35: "https://www.cyclisme-amateur.com/courses-ille-et-vilaine.html",
@@ -12,7 +14,7 @@ FFC_CALENDAR_URLS = {
     56: "https://www.cyclisme-amateur.com/courses-morbihan.html",   
 }
 
-SQLITE_DB_PATH = "sqlite.db"
+SQLITE_DB_PATH = "data/sqlite.db"
 
 REGISTRATION_TOKEN = secrets.token_hex(16)  # V2 -> uses something that can be revoked and regenerated
 

@@ -71,7 +71,7 @@ def manage_users():
     db = get_db()
     users = db.list_users()
 
-    registration_url = "http://localhost:3000/register?_t=" + current_app.config['registration_token']
+    registration_url = current_app.config['external_url'] + "/register?_t=" + current_app.config['registration_token']
 
     if request.method == "POST":
         action = request.form.get("_action")

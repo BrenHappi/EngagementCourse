@@ -445,7 +445,7 @@ class DatabaseRepository:
 
     def create_user(self, email: str, username: str, password: str, firstname: str, lastname: str, role: str = "user", category: Optional[Category] = None, managed_categories: Optional[list[Category]] = None) -> int:
         category_key = category.to_key() if category is not None else None
-        managed_categories_keys = [c.to_key() for c in managed_categories] if managed_categories is not None else None
+        managed_categories_keys = ",".join([c.to_key() for c in managed_categories]) if managed_categories is not None else None
 
         with self._connect() as conn:
             cursor = conn.execute(

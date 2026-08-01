@@ -1,0 +1,50 @@
+.git
+.gitignore
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment and runtime data
+.env
+.env.*
+sqlite.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Optional local docs/assets not needed at runtime
+doc/
+
+# Optional local files for development
+README.md
+instructions.md
+pytest.ini
+todo.md

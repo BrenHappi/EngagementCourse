@@ -27,6 +27,19 @@ dev = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages]
 find = {where = ["src"]}
+
+[tool.setuptools.package-data]
+engagement_course = [
+    "templates/*.html",
+    "templates/partials/*.html",
+    "assets/*.css",
+    "assets/*.png",
+    "assets/*.jpg",
+    "assets/*.jpeg",
+    "assets/*.webp",
+    "assets/*.svg",
+]

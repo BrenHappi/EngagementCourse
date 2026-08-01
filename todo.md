@@ -49,10 +49,13 @@ En +: visualiser les courses sur lesquelles on est inscrit ? (ajouter un filtre?
 3. Add filters: Filtrer les courses sur les inscrits, filtrer sur mes courses
 4. Reset de mot de passe / envoyer un lien de réinitialisation de mot de passe
 
-
 ### V3
 1. API Google map et calcul distance des courses depuis pos actuelle
 2. Système de notification
 3. Synchroniser avec google calendar
+4. Ajout d'équipiers favoris pour savoir où on va
 
-
+Le système de filtre actuel n'est pas très performant et pas très pratique. à la place:
+- faire une vue mois par mois
+<!-- - filtre par distance à notre domicile/temps de route -->
+- affichage beaucoup plus compact, quasi sous forme de tableau pour voir toute les courses 
