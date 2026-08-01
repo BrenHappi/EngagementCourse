@@ -57,7 +57,8 @@ def create_app() -> Flask:
                 Category(level, number)
                 for level, numbers in CATEGORIES.items()
                 for number in numbers
-            ]
+            ],
+            address=None,
         )
 
     lm.init_app(app)

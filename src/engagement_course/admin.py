@@ -14,6 +14,7 @@ class AdminCreateUserForm(FlaskForm):
     username = StringField(validators=[Optional()])
     email = StringField(validators=[DataRequired()])
     password = PasswordField(validators=[DataRequired()])
+    address = StringField(validators=[Optional()])
     category = SelectField(validators=[Optional()])
     role = SelectField(choices=[("user", "User"), ("admin", "Admin")], validators=[DataRequired()])
 
@@ -23,6 +24,7 @@ class AdminUpdateUserForm(FlaskForm):
     lastname = StringField(validators=[Optional()])
     username = StringField(validators=[Optional()])
     email = StringField(validators=[Optional()])
+    address = StringField(validators=[Optional()])
     category = SelectField(validators=[Optional()])
     role = SelectField(choices=[("user", "User"), ("admin", "Admin")], validators=[Optional()])
 
@@ -87,6 +89,7 @@ def manage_users():
                     lastname = (form.lastname.data or "").strip()
                     username = (form.username.data or (firstname[0]+lastname)).strip().lower()
                     role = (form.role.data or "user").strip()
+                    address = (form.address.data or "").strip()
                     category_key = (form.category.data or "").strip()
                     category = Category.from_key(category_key)
 
@@ -111,6 +114,7 @@ def manage_users():
                         lastname=lastname,
                         category=category,
                         role=role.lower(),
+                        address=address,
                     )
                     flash("Utilisateur créé avec succès")
                     return redirect(url_for("admin.manage_users"))
@@ -124,6 +128,7 @@ def manage_users():
                     firstname = (form.firstname.data or "").strip() or None
                     lastname = (form.lastname.data or "").strip() or None
                     username = (form.username.data or "").strip() or None
+                    address = (form.address.data or "").strip() or None
                     role = (form.role.data or "").strip() or None
                     category_key = (form.category.data or "").strip() or None
                     category = Category.from_key(category_key)
@@ -148,6 +153,7 @@ def manage_users():
                         username=username,
                         firstname=firstname,
                         lastname=lastname,
+                        address=address,
                         category=category,
                         role=role.lower() if role else None,
                         managed_categories=None

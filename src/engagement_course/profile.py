@@ -22,6 +22,7 @@ class UpdateProfileForm(FlaskForm):
                             choices=Category.get_category_options(),
                             validators=[Optional()]
             )
+    address = StringField("Adresse", validators=[Optional()])
     current_password = PasswordField("Mot de passe actuel", validators=[Optional()])
     new_password = PasswordField("Nouveau mot de passe", validators=[Optional()])
     confirm_password = PasswordField("Confirmer le nouveau mot de passe", validators=[Optional()])
@@ -45,6 +46,7 @@ def profile():
     profile_form.managed_categories.data = [
         category.to_key() for category in (user.managed_categories or [])
     ]
+    profile_form.address.data = user.address or ""
     
     if request.method == "POST":
         profile_form = UpdateProfileForm(prefix="profile")
@@ -53,6 +55,7 @@ def profile():
             lastname = (profile_form.lastname.data).strip() or user.lastname
             username = (profile_form.username.data).strip() or user.username
             category = Category.from_key(profile_form.category.data.strip()) if profile_form.category.data else None
+            address = (profile_form.address.data or "").strip()
             managed_categories = [
                 category_option
                 for category_option in (
@@ -81,6 +84,7 @@ def profile():
                     username=username,
                     category=category if category else None,
                     managed_categories=managed_categories if user.role == "admin" else None,
+                    address=address,
                     password=new_password if password_change_requested and new_password else None
                 )
                 flash("Utilisateur mis à jour avec succès")

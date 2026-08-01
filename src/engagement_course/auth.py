@@ -23,6 +23,7 @@ class RegisterForm(FlaskForm):
     category = SelectField(validators=[DataRequired()])
     email = StringField(validators=[DataRequired()])
     password = PasswordField(validators=[DataRequired()])
+    address = StringField(validators=[Optional()])
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -80,6 +81,7 @@ def register():
         username = (form.username.data or (firstname[0]+lastname).lower()).strip()
         category_key = form.category.data
         category = Category.from_key(category_key)
+        address = (form.address.data or "").strip()
 
         if category is None:
             flash("Veuillez remplir tous les champs obligatoires")
@@ -101,6 +103,7 @@ def register():
             lastname=lastname,
             category=category,
             role="user",
+            address=address,
         )
         flash("Votre compte a été créé, vous pouvez maintenant vous connecter")
         return redirect(url_for("auth.login"))
