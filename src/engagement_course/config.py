@@ -1,10 +1,12 @@
 import secrets
+from os import environ
 
-ADMIN_EMAIL="admin@example.com"
-ADMIN_PASSWORD="admin"
-SECRET_KEY = "121c4bcdfa653bb27efdd69fb41681b5"
 
-EXTERNAL_URL = "http://localhost:8000"
+ADMIN_EMAIL=environ.get("ADMIN_EMAIL")
+ADMIN_PASSWORD=environ.get("ADMIN_PASSWORD")
+SECRET_KEY = environ.get("SECRET_KEY")
+
+EXTERNAL_URL = environ.get("EXTERNAL_URL")
 
 FFC_CALENDAR_URLS = {
     22: "https://www.cyclisme-amateur.com/courses-cotes-d-armor.html",
@@ -19,3 +21,10 @@ SQLITE_DB_PATH = "data/sqlite.db"
 REGISTRATION_TOKEN = secrets.token_hex(16)  # V2 -> uses something that can be revoked and regenerated
 
 DATE_FORMAT = "%d/%m/%Y"
+
+# SMTP configuration
+notify = True
+SMTP_HOSTNAME = environ.get("SMTP_HOSTNAME")
+SMTP_PORT = int(environ.get("SMTP_PORT", 587))
+SMTP_USERNAME = environ.get("SMTP_USERNAME")
+SMTP_PASSWORD = environ.get("SMTP_PASSWORD")

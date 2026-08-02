@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 from flask_login import current_user, login_required
 from datetime import datetime, timedelta
 from engagement_course.models import EngagementStatus
 from pydantic import BaseModel, Field
 from engagement_course.utils import get_db
+from engagement_course.mail import send_email
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -80,6 +81,13 @@ def create_engagement():
 
     try:
         db.create_engagement(user_id=current_user.id, race=race, status=status)
+        if current_app.config['notify']:
+            send_email(
+                to_address=db.get_manager_for_category(current_user.category).email,
+                subject=f"Demande inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}",
+                message=f"Vous avez reçu une nouvelle demande d'inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}. "
+                        f"Veuillez vous connecter sur {current_app.config['external_url']}/admin pour valider ou refuser cette demande."
+            )
         return jsonify({"status": "success", "message": "Engagement created successfully"}), 201
     except ValueError:
         return jsonify({"status": "error", "message": "Failed to create engagement"}), 400  # Duplicate engagement?

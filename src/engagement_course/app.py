@@ -38,6 +38,14 @@ def create_app() -> Flask:
     app.config["external_url"] = config.EXTERNAL_URL
     app.config['registration_token'] = config.REGISTRATION_TOKEN
 
+    # SMTP configuration
+    app.config['notify'] = config.notify
+    if app.config['notify']:
+        app.config['smtp_hostname'] = config.SMTP_HOSTNAME
+        app.config['smtp_port'] = config.SMTP_PORT
+        app.config['smtp_username'] = config.SMTP_USERNAME
+        app.config['smtp_password'] = config.SMTP_PASSWORD
+
     try:
         seeded_count = seed_races_from_ffc(db)
         if seeded_count:

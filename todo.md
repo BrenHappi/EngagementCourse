@@ -50,7 +50,7 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 4. Reset de mot de passe / envoyer un lien de réinitialisation de mot de passe
 
 ### V3
-1. API Google map et calcul distance des courses depuis pos actuelle
+~~1. API Google map et calcul distance des courses depuis pos actuelle~~
 2. Système de notification
 3. Synchroniser avec google calendar
 4. Ajout d'équipiers favoris pour savoir où on va

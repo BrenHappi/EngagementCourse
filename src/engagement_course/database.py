@@ -699,3 +699,33 @@ class DatabaseRepository:
             address_lat=row["address_lat"],
             address_lon=row["address_lon"]
         )
+
+
+    def get_manager_for_category(self, category: Category) -> User | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
+                FROM users
+                WHERE role = 'admin' AND managed_categories LIKE ?
+                """,
+                (f"%{category.to_key()}%",)
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return User(
+            user_id=row["id"],
+            email=row["email"],
+            username=row["username"],
+            password_hash=row["password"],
+            category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+            managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None,
+            firstname=row["firstname"],
+            lastname=row["lastname"],
+            role=row["role"],
+            address=row["address"],
+            address_lat=row["address_lat"],
+            address_lon=row["address_lon"]
+        )
