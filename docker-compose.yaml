@@ -1,9 +1,24 @@
 services:
   app:
     build: .
-    ports:
-      - "8000:8000"
     volumes:
-      # - ./data:/app/data
-      - .:/app/
-      
+      - ./data:/app/data
+    environment:
+      - FLASK_APP=${FLASK_APP}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - EXTERNAL_URL=${EXTERNAL_URL}
+      - SMTP_HOSTNAME=${SMTP_HOSTNAME}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+
+  server:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
