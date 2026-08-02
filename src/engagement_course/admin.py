@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from wtforms import HiddenField, PasswordField, SelectField, StringField
 from wtforms.validators import DataRequired, Optional
+from engagement_course.mail import send_email
 from engagement_course.utils import get_db
 from engagement_course.models import CATEGORIES, Category, EngagementStatus
 
@@ -211,6 +212,12 @@ def manage_engagements():
 
             db.update_engagement(engagement_id, status.value)
             flash(f"Engagement {engagement_id} mis à jour avec succès")
+            if current_app.config['notify'] and engagement.user.email:
+                send_email(
+                    to_address=engagement.user.email,
+                    subject=f"Votre demande d'inscription à {engagement.race.location} a été {status.value}",
+                    message=f"Bonjour {engagement.user.firstname},\n\nVotre demande d'inscription à {engagement.race.location} ({engagement.race.department}) le {engagement.race.date} a été {status.value} par l'administrateur.\n\nCordialement,\nASPTT Rennes"
+                )
             return redirect(url_for("admin.manage_engagements"))
 
     selected_status = request.args.get("status", default=EngagementStatus.PENDING.value)

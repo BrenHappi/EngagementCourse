@@ -4,7 +4,7 @@ Script de seed: remplit la base de données avec des données de test.
 Usage: python seed_db.py
 """
 
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from src.engagement_course.database import DatabaseRepository
 from src.engagement_course.models import Category, RaceEvent, EngagementStatus
 

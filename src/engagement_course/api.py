@@ -81,9 +81,10 @@ def create_engagement():
 
     try:
         db.create_engagement(user_id=current_user.id, race=race, status=status)
-        if current_app.config['notify']:
+        manager_email = db.get_manager_for_category(current_user.category).email
+        if current_app.config['notify'] and manager_email:
             send_email(
-                to_address=db.get_manager_for_category(current_user.category).email,
+                to_address=manager_email,
                 subject=f"Demande inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}",
                 message=f"Vous avez reçu une nouvelle demande d'inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}. "
                         f"Veuillez vous connecter sur {current_app.config['external_url']}/admin pour valider ou refuser cette demande."

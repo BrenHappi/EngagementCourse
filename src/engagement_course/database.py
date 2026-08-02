@@ -147,29 +147,73 @@ class DatabaseRepository:
 
     def replace_races(self, races: list[RaceEvent]) -> None:
         with self._connect() as conn:
-            conn.execute("DELETE FROM races")
+            existing_rows = conn.execute(
+                """
+                SELECT id, race_day, date, location, department, federation, race_type
+                FROM races
+                """
+            ).fetchall()
+            existing_by_key: dict[tuple[str, str, str, int, str, str], int] = {
+                (
+                    row["race_day"],
+                    row["date"],
+                    row["location"],
+                    int(row["department"]),
+                    row["federation"],
+                    row["race_type"],
+                ): int(row["id"])
+                for row in existing_rows
+            }
+
+            seen_keys: set[tuple[str, str, str, int, str, str]] = set()
+
             for race in races:
                 if race.type != "ROUTE":
                     continue    # only store "ROUTE" races
                 if not race.categories:
                     continue    # skip races without categories
-                cursor = conn.execute(
-                    """
-                    INSERT INTO races (race_day, date, location, location_lat, location_lon, department, federation, race_type)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        race.race_day,
-                        race.date,
-                        race.location,
-                        None,
-                        None,
-                        race.department,
-                        race.federation,
-                        race.type,
-                    ),
+
+                race_date = race.date.strftime("%Y-%m-%d")
+                race_key = (
+                    race.race_day,
+                    race_date,
+                    race.location,
+                    int(race.department),
+                    race.federation,
+                    race.type,
                 )
-                race_id = int(cursor.lastrowid)
+                seen_keys.add(race_key)
+
+                if race_key in existing_by_key:
+                    race_id = existing_by_key[race_key]
+                    conn.execute(
+                        """
+                        UPDATE races
+                        SET location_lat = ?, location_lon = ?
+                        WHERE id = ?
+                        """,
+                        (race.location_lat, race.location_lon, race_id),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO races (race_day, date, location, location_lat, location_lon, department, federation, race_type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            race.race_day,
+                            race_date,
+                            race.location,
+                            race.location_lat,
+                            race.location_lon,
+                            race.department,
+                            race.federation,
+                            race.type,
+                        ),
+                    )
+                    race_id = int(cursor.lastrowid)
+
+                conn.execute("DELETE FROM race_categories WHERE race_id = ?", (race_id,))
 
                 category_records = [
                     (race_id, category.level, category.number)
@@ -183,6 +227,20 @@ class DatabaseRepository:
                         """,
                         category_records,
                     )
+
+            stale_race_ids = [
+                race_id
+                for race_key, race_id in existing_by_key.items()
+                if race_key not in seen_keys
+            ]
+            for race_id in stale_race_ids:
+                has_engagement = conn.execute(
+                    "SELECT 1 FROM engagements WHERE race_id = ? LIMIT 1",
+                    (race_id,),
+                ).fetchone()
+                if has_engagement:
+                    continue
+                conn.execute("DELETE FROM races WHERE id = ?", (race_id,))
 
 
     def get_race_by_id(self, race_id:int) -> RaceEvent | None:

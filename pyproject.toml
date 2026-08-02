@@ -16,7 +16,8 @@ dependencies = [
     "bcrypt",
     "flask-login",
     "flask-wtf>=1.2.2",
-    "pydantic>=2.12.5"
+    "pydantic>=2.12.5",
+    "gunicorn>=21.0"
 ]
 
 [project.optional-dependencies]
