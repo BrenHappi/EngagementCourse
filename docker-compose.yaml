@@ -1,24 +1,47 @@
+# Usage:
+#   prod : docker compose --profile prod up -d --build
+#   dev  : docker compose --profile dev up --build    -> http://localhost:8000
+
+x-app-environment: &app-environment
+  FLASK_APP: ${FLASK_APP}
+  ADMIN_EMAIL: ${ADMIN_EMAIL}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+  SECRET_KEY: ${SECRET_KEY}
+  EXTERNAL_URL: ${EXTERNAL_URL}
+  SMTP_HOSTNAME: ${SMTP_HOSTNAME}
+  SMTP_PORT: ${SMTP_PORT}
+  SMTP_USERNAME: ${SMTP_USERNAME}
+  SMTP_PASSWORD: ${SMTP_PASSWORD}
+
 services:
   app:
+    profiles: [prod]
     build: .
     volumes:
       - ./data:/app/data
-    environment:
-      - FLASK_APP=${FLASK_APP}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-      - EXTERNAL_URL=${EXTERNAL_URL}
-      - SMTP_HOSTNAME=${SMTP_HOSTNAME}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USERNAME=${SMTP_USERNAME}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    environment: *app-environment
+    restart: unless-stopped
 
   server:
+    profiles: [prod]
     image: caddy:2-alpine
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
       - app
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+
+  # Flask dev server with debugger and auto-reload: never expose publicly
+  app-dev:
+    profiles: [dev]
+    build: .
+    command: ["python3", "main.py", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - .:/app/
+    environment:
+      <<: *app-environment
+      EXTERNAL_URL: http://localhost:8000
