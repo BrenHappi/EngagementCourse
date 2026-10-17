@@ -65,7 +65,7 @@ def create_engagement():
         return jsonify({"status": "error", "message": "Race not found"}), 404
     
     # Check if the user category is compatible with the race
-    if not _race_accepts_user_category(race, target_user.category):
+    if race.requires_category_match and not _race_accepts_user_category(race, target_user.category):
         return jsonify({"status": "error", "message": "User category not compatible with race"}), 400
     
     # Checking that the race is in less than 5 days

@@ -86,9 +86,13 @@
 							<strong>{{ engagement.race.location|upper }} ({{ engagement.race.department }})</strong>
 							<span> - </span>
 							<span>
-								{% for category in engagement.race.categories %}
-									{{ category }}{% if not loop.last %} / {% endif %}
-								{% endfor %}
+								{% if not engagement.race.requires_category_match %}
+									{{ engagement.race.type }} · {{ engagement.race.categories_label }}
+								{% else %}
+									{% for category in engagement.race.categories %}
+										{{ category }}{% if not loop.last %} / {% endif %}
+									{% endfor %}
+								{% endif %}
 							</span>
 						</p>
 						<p class="engagement-date-line">{{ engagement.race.race_day }} {{ engagement.race.display_date() }}</p>

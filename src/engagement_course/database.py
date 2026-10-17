@@ -4,7 +4,7 @@ from bcrypt import hashpw, gensalt
 from typing import Optional
 from datetime import datetime
 from engagement_course.config import SQLITE_DB_PATH
-from engagement_course.models import Category, RaceEvent, RaceFilter, User, Engagement
+from engagement_course.models import CATEGORY_FREE_RACE_TYPES, merge_cyclocross_events, normalize_location, Category, RaceEvent, RaceFilter, User, Engagement
 
 
 class DatabaseRepository:
@@ -120,6 +120,8 @@ class DatabaseRepository:
                 conn.execute("ALTER TABLE races ADD COLUMN location_lat REAL")
             if "location_lon" not in race_columns:
                 conn.execute("ALTER TABLE races ADD COLUMN location_lon REAL")
+            if "categories_label" not in race_columns:
+                conn.execute("ALTER TABLE races ADD COLUMN categories_label TEXT")
 
             user_columns = {
                 row["name"]
@@ -188,34 +190,41 @@ class DatabaseRepository:
 
 
     def replace_races(self, races: list[RaceEvent]) -> None:
+        for race in races:
+            race.location = normalize_location(race.location)
+        races = merge_cyclocross_events(races)
         with self._connect() as conn:
             existing_rows = conn.execute(
                 """
                 SELECT id, race_day, date, location, department, federation, race_type
                 FROM races
+                ORDER BY id
                 """
             ).fetchall()
-            existing_by_key: dict[tuple[str, str, str, int, str, str], int] = {
-                (
+            existing_categories: dict[int, list[str]] = {}
+            for row in conn.execute("SELECT race_id, level, number FROM race_categories"):
+                existing_categories.setdefault(int(row["race_id"]), []).append(f"{row['level']}_{row['number']}")
+            # Several races can share a key (e.g. OPEN and ACCESS races of the same event): keep all ids,
+            # each imported race reuses one of them, the leftovers are stale
+            existing_by_key: dict[tuple, list[int]] = {}
+            for row in existing_rows:
+                key = (
                     row["race_day"],
                     row["date"],
-                    row["location"],
+                    normalize_location(row["location"]),  # rows stored before locations were normalized
                     int(row["department"]),
                     row["federation"],
                     row["race_type"],
-                ): int(row["id"])
-                for row in existing_rows
-            }
-
-            seen_keys: set[tuple[str, str, str, int, str, str]] = set()
+                    tuple(sorted(existing_categories.get(int(row["id"]), []))),
+                )
+                existing_by_key.setdefault(key, []).append(int(row["id"]))
 
             for race in races:
-                if race.type != "ROUTE":
-                    continue    # only store "ROUTE" races
-                if not race.categories:
-                    continue    # skip races without categories
+                if not race.is_relevant():
+                    continue
 
                 race_date = race.date.strftime("%Y-%m-%d")
+                stored_categories = (race.categories or []) if race.requires_category_match else []
                 race_key = (
                     race.race_day,
                     race_date,
@@ -223,24 +232,24 @@ class DatabaseRepository:
                     int(race.department),
                     race.federation,
                     race.type,
+                    tuple(sorted(category.to_key() for category in stored_categories)),
                 )
-                seen_keys.add(race_key)
 
-                if race_key in existing_by_key:
-                    race_id = existing_by_key[race_key]
+                if existing_by_key.get(race_key):
+                    race_id = existing_by_key[race_key].pop(0)
                     conn.execute(
                         """
                         UPDATE races
-                        SET location_lat = ?, location_lon = ?
+                        SET location = ?, location_lat = ?, location_lon = ?, categories_label = ?
                         WHERE id = ?
                         """,
-                        (race.location_lat, race.location_lon, race_id),
+                        (race.location, race.location_lat, race.location_lon, race.categories_label, race_id),
                     )
                 else:
                     cursor = conn.execute(
                         """
-                        INSERT INTO races (race_day, date, location, location_lat, location_lon, department, federation, race_type)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO races (race_day, date, location, location_lat, location_lon, department, federation, race_type, categories_label)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             race.race_day,
@@ -251,6 +260,7 @@ class DatabaseRepository:
                             race.department,
                             race.federation,
                             race.type,
+                            race.categories_label,
                         ),
                     )
                     race_id = int(cursor.lastrowid)
@@ -259,7 +269,7 @@ class DatabaseRepository:
 
                 category_records = [
                     (race_id, category.level, category.number)
-                    for category in race.categories
+                    for category in stored_categories
                 ]
                 if category_records:
                     conn.executemany(
@@ -270,11 +280,7 @@ class DatabaseRepository:
                         category_records,
                     )
 
-            stale_race_ids = [
-                race_id
-                for race_key, race_id in existing_by_key.items()
-                if race_key not in seen_keys
-            ]
+            stale_race_ids = [race_id for race_ids in existing_by_key.values() for race_id in race_ids]
             for race_id in stale_race_ids:
                 has_engagement = conn.execute(
                     "SELECT 1 FROM engagements WHERE race_id = ? LIMIT 1",
@@ -353,6 +359,12 @@ class DatabaseRepository:
                 )
                 params.append(cat.level)
                 params.append(cat.number)
+            # Cyclo-cross age-group races (no OPEN/ACCESS categories) are open to every rider
+            cat_conditions.append(
+                f"(r.race_type IN ({', '.join('?' * len(CATEGORY_FREE_RACE_TYPES))})"
+                " AND NOT EXISTS (SELECT 1 FROM race_categories AS rc WHERE rc.race_id = r.id))"
+            )
+            params.extend(CATEGORY_FREE_RACE_TYPES)
             where.append("(" + " OR ".join(cat_conditions) + ")")
 
         query = f"""
@@ -366,6 +378,7 @@ class DatabaseRepository:
             r.department,
             r.federation,
             r.race_type,
+            r.categories_label,
             rc.level AS category_level,
             rc.number AS category_number
             FROM races as r
@@ -395,6 +408,7 @@ class DatabaseRepository:
                     federation=row["federation"],
                     type=row["race_type"],
                     categories=[],
+                    categories_label=row["categories_label"],
                 )
                 races_by_id[race_id] = race
 
@@ -502,18 +516,27 @@ class DatabaseRepository:
                     params.append(cat.number)
 
                 if category_filters:
+                    # Races without OPEN/ACCESS categories (cyclo-cross): match on the rider category instead
+                    category_keys = [cat.to_key() for cat in categories if cat is not None]
+                    params.extend(CATEGORY_FREE_RACE_TYPES)
+                    params.extend(category_keys)
                     where_clauses.append(
                         """
-                        EXISTS (
+                        (EXISTS (
                             SELECT 1 FROM race_categories AS rc
                             WHERE rc.race_id = e.race_id
                             AND (
                                 """
                         + " OR ".join(category_filters)
                         +
-                        """
+                        f"""
                             )
                         )
+                        OR (
+                            EXISTS (SELECT 1 FROM races AS r WHERE r.id = e.race_id AND r.race_type IN ({', '.join('?' * len(CATEGORY_FREE_RACE_TYPES))}))
+                            AND NOT EXISTS (SELECT 1 FROM race_categories AS rc WHERE rc.race_id = e.race_id)
+                            AND EXISTS (SELECT 1 FROM users AS u WHERE u.id = e.user_id AND u.category_key IN ({', '.join('?' * len(category_keys))}))
+                        ))
                         """
                     )
 

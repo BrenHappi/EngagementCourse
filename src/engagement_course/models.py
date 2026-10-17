@@ -1,6 +1,8 @@
 from datetime import date
 from enum import Enum
 import re
+import unicodedata
+from difflib import SequenceMatcher
 from typing import Optional
 from dataclasses import dataclass
 from bcrypt import checkpw
@@ -17,6 +19,101 @@ CATEGORIES = {
     "OPEN": [1, 2, 3],
     "ACCESS": [1, 2, 3, 4],
 }
+
+
+# Race types imported from the FFC calendar
+ROAD_RACE_TYPE = "ROUTE"
+CYCLOCROSS_RACE_TYPE = "CYCLO-CROSS"
+# Race types whose categories are not OPEN/ACCESS: any rider can ask, the manager checks
+CATEGORY_FREE_RACE_TYPES = (CYCLOCROSS_RACE_TYPE,)
+
+_YOUTH_MARKERS = ("ECOLE", "MINIME", "CADET", "U 15", "U 17", "U15", "U17")
+_ADULT_MARKERS = ("SENIOR", "VETERAN", "ESPOIR", "ELITE", "OPEN", "ACCESS", "DAMES", "TOUTE")
+
+
+def _normalize_text(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)).upper()
+
+
+def normalize_location(location: str) -> str:
+    """Cleans an FFC location: "Pleven ( la chauvinais ).", "Vitré ." -> "Pleven ( la chauvinais )", "Vitré"."""
+    return " ".join(location.split()).rstrip(" .")
+
+
+def _same_place(location_a: str, location_b: str) -> bool:
+    # Compare town names only, tolerating typos of the source ("Pleudihen" / "Pleuhidan")
+    a, b = (re.sub(r"[^A-Z0-9]", "", _normalize_text(loc.split("(")[0])) for loc in (location_a, location_b))
+    return a == b or SequenceMatcher(None, a, b).ratio() >= 0.75
+
+
+def merge_cyclocross_events(races: list["RaceEvent"]) -> list["RaceEvent"]:
+    """
+    The FFC calendar lists one row per category race of a cyclo-cross event.
+    - OPEN/ACCESS races are kept as separate entries, like road races, so each rider
+      engages in his own category (duplicates of the same race are dropped)
+    - adult age-group races (U23/Séniors/Vétérans, U19 + Dames...) are merged into one
+      entry open to every rider, labelled with these races
+    Youth races are dropped.
+    """
+    merged: list[RaceEvent] = []
+
+    def find_entry(race: "RaceEvent", category_keys: list[str]) -> "RaceEvent | None":
+        return next(
+            (
+                e for e in merged
+                if e.type == CYCLOCROSS_RACE_TYPE
+                and (e.date, e.department, e.federation) == (race.date, race.department, race.federation)
+                and sorted(c.to_key() for c in e.categories or []) == category_keys
+                and _same_place(e.location, race.location)
+            ),
+            None,
+        )
+
+    for race in races:
+        if race.type != CYCLOCROSS_RACE_TYPE:
+            merged.append(race)
+            continue
+        if not is_adult_categories_label(race.categories_label):
+            continue
+
+        label = " ".join(race.categories_label.split("(")[0].split())
+        category_keys = sorted(c.to_key() for c in race.categories or [])
+        entry = find_entry(race, category_keys)
+        if race.categories:
+            if entry is None:
+                merged.append(race)
+            continue
+
+        if entry is None:
+            entry = RaceEvent(race.race_day, race.date, race.location, race.department, race.federation, race.type, None)
+            entry.age_group_races = []
+            merged.append(entry)
+        if label not in entry.age_group_races:
+            entry.age_group_races.append(label)
+        entry.categories_label = " · ".join(entry.age_group_races)
+    return merged
+
+
+def is_adult_categories_label(label: str | None) -> bool:
+    """
+    Tells whether a raw FFC category label is open to adult riders, i.e. one of its
+    "+"-separated groups is an adult one.
+    e.g. "U 23 SéNIORS + VéTéRANS", "1,2 + JUNIORS", "U 17 + DAMES" -> True
+         "ECOLE DE CYCLISME", "U 17", "DAMES U 17 + U 15 FILLES" -> False
+    """
+    if not label:
+        return False
+    if "CL GENERAL" in _normalize_text(label):
+        return False  # season ranking, not a race
+    text = _normalize_text(label.split("(")[0])  # drop event details, e.g. "( COUPE DE BRETAGNE )"
+    for group in text.split("+"):
+        group = group.strip()
+        if any(marker in group for marker in _YOUTH_MARKERS):
+            continue
+        # Groups starting with a number are cyclo-cross levels, e.g. "1,2" in "1,2 + JUNIORS"
+        if group[:1].isdigit() or any(marker in group for marker in _ADULT_MARKERS):
+            return True
+    return False
 
 
 class EngagementStatus(str, Enum):
@@ -114,6 +211,7 @@ class RaceEvent:
         id: Optional[int] = None,
         location_lat: Optional[float] = None,
         location_lon: Optional[float] = None,
+        categories_label: Optional[str] = None,
     ):
         self.id = id
         self.race_day = race_day
@@ -125,6 +223,7 @@ class RaceEvent:
         self.federation = federation
         self.type = type
         self.categories = categories
+        self.categories_label = categories_label  # FFC label; for cyclo-cross, the adult races of the event
         self.distance_km: Optional[float] = None
         # engagements
         self.engagements: list[Engagement] = []
@@ -138,6 +237,19 @@ class RaceEvent:
     
     def display_date(self) -> str:
         return self.date.strftime(DATE_FORMAT)
+
+    @property
+    def requires_category_match(self) -> bool:
+        # Cyclo-cross age-group races are open to every rider, its OPEN/ACCESS races are not
+        return self.type not in CATEGORY_FREE_RACE_TYPES or bool(self.categories)
+
+    def is_relevant(self) -> bool:
+        """Races stored in the club calendar: road races open to OPEN/ACCESS, and adult cyclo-cross."""
+        if self.type == ROAD_RACE_TYPE:
+            return bool(self.categories)
+        if self.type == CYCLOCROSS_RACE_TYPE:
+            return is_adult_categories_label(self.categories_label)
+        return False
 
 
 @dataclass(slots=True)

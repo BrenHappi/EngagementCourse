@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
-from engagement_course.models import RaceEvent, Category
+from engagement_course.models import RaceEvent, Category, normalize_location
 
 FRENCH_MONTHS = {
     "janvier": "01", "février": "02", "mars": "03", "avril": "04",
@@ -58,14 +58,16 @@ class FFCParser:
                     index_offset = 1
                 else:
                     raise Exception(f"Unexpected number of cells: {len(cells)}.\nRow content: {row}")
+                categories_label = cells[4-index_offset].text.strip()
                 race = RaceEvent(
                         race_day=day.split()[0],
                         date=datetime.datetime.strptime(day.split()[1]+"/"+month_num+"/"+year, "%d/%m/%Y").date(),
-                        location=cells[1-index_offset].text.strip().replace(" .", ""),
+                        location=normalize_location(cells[1-index_offset].text),
                         department=self.department,
                         federation=cells[2-index_offset].text.strip(),
                         type=cells[3-index_offset].text.strip(),
-                        categories=Category.from_string(cells[4-index_offset].text.strip())
+                        categories=Category.from_string(categories_label),
+                        categories_label=categories_label,
                     )
                 races.append(race)
         return races

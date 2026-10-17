@@ -81,9 +81,11 @@ def create_user(db):
 
 @pytest.fixture
 def create_race(db):
-    def factory(days_ahead=20, categories=None, location="Vitré"):
+    def factory(days_ahead=20, categories=None, location="Vitré", race_type="ROUTE", categories_label=None):
         date = datetime.datetime.now() + datetime.timedelta(days=days_ahead)
-        race = RaceEvent("Sam", date, location, 35, "FFC", "ROUTE", categories or [Category("OPEN", 1)])
+        if race_type == "ROUTE" and categories is None:
+            categories = [Category("OPEN", 1)]
+        race = RaceEvent("Sam", date, location, 35, "FFC", race_type, categories, categories_label=categories_label)
         existing = db.list_races()
         db.replace_races(existing + [race])
         return next(r for r in db.list_races() if r.location == location)

@@ -154,7 +154,9 @@
 							<td class="col-fed">{{ race.federation }}</td>
 							<td class="col-type">{{ race.type }}</td>
 							<td class="col-cat">
-								{% if race.categories %}
+								{% if not race.requires_category_match %}
+									<span class="cat-label">{{ race.categories_label or '—' }}</span>
+								{% elif race.categories %}
 									{% for cat in race.categories %}
 										<span class="cat-tag" title="{{ cat.level }} {{ cat.number }}">{{ cat.level[0] }}{{ cat.number }}</span>
 									{% endfor %}
