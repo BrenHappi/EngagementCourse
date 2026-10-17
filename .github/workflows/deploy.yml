@@ -63,6 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run the deploy script on the server
+        # Connects as the user that owns the checkout, not root: the repository
+        # and the Git deploy key belong to them, and they are in the docker group.
         # The key is restricted to scripts/deploy.sh by a forced command in
         # authorized_keys, so the command sent here is ignored.
         run: |
@@ -70,7 +72,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -o BatchMode=yes -i ~/.ssh/id_ed25519 "root@$DEPLOY_HOST" deploy
+          ssh -o BatchMode=yes -i ~/.ssh/id_ed25519 "debian@$DEPLOY_HOST" deploy
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

@@ -48,7 +48,9 @@ services:
       app:
         condition: service_healthy
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The folder, not the file: git replaces the Caddyfile on update, and a single-file
+      # bind mount would keep showing the old one to the container until it is recreated
+      - ./deploy/caddy:/etc/caddy:ro
       # Access log on the host, for fail2ban
       - /var/log/caddy:/var/log/caddy
       # Certificates must persist, otherwise each restart asks Let's Encrypt again (rate limited)

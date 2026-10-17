@@ -37,10 +37,25 @@ wait_healthy() {
     return 1
 }
 
+# `up -d` does not restart Caddy when only its Caddyfile changed: reload it.
+# Caddy may still be starting if `up -d` just recreated it, hence the retries.
+# An invalid Caddyfile is refused and the running config is kept.
+reload_caddy() {
+    tries=0
+    until compose exec -T server caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 5 ]; then
+            echo "Caddy refused the new Caddyfile, it keeps running the previous config" >&2
+            return 1
+        fi
+        sleep 3
+    done
+}
+
 main() {
     cd "$(dirname "$0")/.."
 
-    # Config too, not just code: docker-compose.yaml, Caddyfile, deploy/
+    # Config too, not just code: docker-compose.yaml, deploy/ (Caddyfile, fail2ban)
     git fetch --quiet origin main
     git reset --hard --quiet origin/main
 
@@ -53,6 +68,7 @@ main() {
     compose up -d
 
     if wait_healthy; then
+        reload_caddy
         docker image prune -f >/dev/null
         echo "deployed $(git rev-parse --short HEAD) from $image"
         return 0

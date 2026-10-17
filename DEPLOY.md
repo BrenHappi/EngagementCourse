@@ -2,7 +2,7 @@
 
 L'application tourne sur n'importe quel serveur Linux avec Docker. Caddy est en frontal avec le HTTPS automatique, et la base SQLite est stockée dans `data/`.
 
-Dans ce guide, `<IP>` désigne l'IP publique du serveur (l'exemple utilisé est `203.0.113.10`), `<REPO_URL>` l'URL du dépôt Git, et `<APP_DIR>` le dossier d'installation (par exemple `/opt/engagement-course`).
+Dans ce guide, `<IP>` désigne l'IP publique du serveur (l'exemple utilisé est `203.0.113.10`), `<REPO_URL>` l'URL du dépôt Git, et `<APP_DIR>` le dossier d'installation. `<APP_USER>` désigne l'utilisateur qui possède ce dossier (sur ce serveur : `debian`, et `<APP_DIR>` vaut `/home/debian/EngagementCourse`).
 
 ## 1. Serveur
 
@@ -40,10 +40,11 @@ Si le dépôt est privé, utiliser une deploy key en lecture seule (`ssh-keygen 
 L'image n'est pas construite sur le serveur mais récupérée depuis GHCR (voir l'étape 8). Le dépôt étant privé, l'image l'est aussi : il faut donc autoriser le serveur à la tirer, avec un [token classique](https://github.com/settings/tokens) dont le seul scope est `read:packages`.
 
 ```bash
+# en <APP_USER>, pas en root : c'est lui qui tirera l'image
 docker login ghcr.io -u <utilisateur GitHub>   # mot de passe = le token
 ```
 
-Les identifiants sont enregistrés dans `/root/.docker/config.json` et n'ont pas à être renouvelés, sauf si le token expire.
+Les identifiants sont enregistrés dans `~<APP_USER>/.docker/config.json` et n'ont pas à être renouvelés, sauf si le token expire.
 
 ## 4. Configurer le `.env`
 
@@ -86,7 +87,15 @@ Au premier démarrage, la base est créée et les courses FFC importées.
 
 ## 6. Tâches planifiées
 
-`crontab -e` (en root), en remplaçant `<APP_DIR>` :
+Les tâches tournent en `<APP_USER>`, qui n'a pas le droit d'écrire dans `/var/log`. Créer les fichiers de log à son nom une fois pour toutes, sinon la redirection échoue et la tâche ne démarre même pas :
+
+```bash
+sudo install -o <APP_USER> -g <APP_USER> -m 644 /dev/null /var/log/engagement-seed.log
+sudo install -o <APP_USER> -g <APP_USER> -m 644 /dev/null /var/log/engagement-backup.log
+sudo install -o <APP_USER> -g <APP_USER> -m 644 /dev/null /var/log/engagement-recap.log
+```
+
+Puis `crontab -e` **en `<APP_USER>`** (pas en root : `docker compose` lui est accessible par le groupe `docker`), en remplaçant `<APP_DIR>` :
 
 ```cron
 # Import des courses FFC, chaque nuit
@@ -114,12 +123,16 @@ Caddy écrit ses logs d'accès dans `/var/log/caddy/access.log` sur l'hôte. Deu
 
 | Prison | Déclencheur | Bannissement |
 |---|---|---|
-| `caddy-login` | 5 échecs de connexion en 10 min | 1 h |
-| `caddy-scan` | 3 requêtes de scanner en 10 min (`.php`, `.env`, `/.git`, `wp-`…) | 1 jour |
+| `caddy-login` | 10 échecs de connexion en 1 min | 1 h |
+| `caddy-scan` | 10 requêtes de scanner en 1 min (`.php`, `.env`, `/.git`, `wp-`…) | 1 jour |
 
 Les ports publiés par Docker ne passent pas par la chaîne `INPUT`. Les bannissements sont donc ajoutés dans la chaîne `DOCKER-USER`, et fail2ban doit démarrer après Docker.
 
+fail2ban refuse de démarrer si ce fichier n'existe pas (`Have not found any log file for caddy-login jail`). Caddy le crée à son démarrage : la stack de l'étape 5 doit donc tourner avant, ce que vérifie la première commande.
+
 ```bash
+ls -l /var/log/caddy/access.log   # doit exister, sinon voir « Dépannage »
+
 sudo apt install fail2ban
 sudo cp deploy/fail2ban/filter.d/*.conf /etc/fail2ban/filter.d/
 sudo cp deploy/fail2ban/jail.d/*.conf /etc/fail2ban/jail.d/
@@ -152,7 +165,7 @@ sudo fail2ban-client set caddy-scan unbanip <IP>                                
 
 L'image est construite chez GitHub et non sur le serveur : le droplet n'a que 512 Mo de RAM, et le cache de layers rend le build bien plus rapide.
 
-`scripts/deploy.sh` met à jour le dépôt (donc aussi `docker-compose.yaml`, le `Caddyfile` et `deploy/`), tire la nouvelle image, redémarre la stack, puis attend que le healthcheck passe. **Si l'app ne devient pas `healthy` en 2 minutes, le script remet l'image précédente** et le job échoue — GitHub envoie alors un email.
+`scripts/deploy.sh` met à jour le dépôt (donc aussi `docker-compose.yaml` et `deploy/`, dont le `Caddyfile` dans `deploy/caddy/`), tire la nouvelle image, redémarre la stack, attend que le healthcheck passe, puis recharge la config de Caddy. Un `Caddyfile` invalide est refusé par Caddy, qui garde l'ancienne config, et le job échoue. **Si l'app ne devient pas `healthy` en 2 minutes, le script remet l'image précédente** et le job échoue — GitHub envoie alors un email.
 
 L'app redémarre pendant le déploiement : le site est indisponible quelques secondes.
 
@@ -171,14 +184,18 @@ La clé privée (`engagement-deploy`) part dans le secret `DEPLOY_SSH_KEY`, la p
 Sur le serveur, autoriser la clé publique **pour cette seule commande** : `command=` force l'exécution du script quoi que demande le client, et `restrict` coupe le forwarding et le pty. Même si la clé fuite, elle ne permet que de déclencher un déploiement.
 
 ```bash
-# en root, sur le serveur, en remplaçant <APP_DIR> et la clé publique
+# en <APP_USER>, sur le serveur, en remplaçant <APP_DIR> et la clé publique
 printf 'restrict,command="<APP_DIR>/scripts/deploy.sh" %s\n' \
-  'ssh-ed25519 AAAA... github-actions' >> /root/.ssh/authorized_keys
+  'ssh-ed25519 AAAA... github-actions' >> ~/.ssh/authorized_keys
 ```
 
 `<APP_DIR>` doit être un **chemin absolu** : sshd n'étend ni `~` ni les variables dans un `command=`.
 
-Ce mode de déploiement se connecte en root, donc `sshd -T | grep permitrootlogin` ne doit pas répondre `no`. La valeur `forced-commands-only` suffit et reste la plus restrictive : elle autorise exactement les clés porteuses d'un `command=`, donc celle-ci et aucune autre.
+Le déploiement se connecte en `<APP_USER>` et non en root, ce que le workflow attend (`debian@$DEPLOY_HOST`). Ce n'est pas un détail de confort :
+
+- Git refuse d'opérer sur un dépôt appartenant à un autre utilisateur (`detected dubious ownership`), donc le `git fetch` du script échouerait en root ;
+- la deploy key qui donne accès au dépôt privé est dans `~<APP_USER>/.ssh/`, inaccessible à root ;
+- `<APP_USER>` doit en revanche être dans le groupe `docker` (`getent group docker`), sinon `docker compose` lui est refusé.
 
 ### Secrets du dépôt
 
@@ -195,12 +212,12 @@ Dans GitHub → Settings → Secrets and variables → Actions :
 La commande forcée pointe vers `scripts/deploy.sh`, qui n'arrive sur le serveur que par `git pull`. Il faut donc l'y amener avant d'installer la clé :
 
 1. Pousser le commit sur `main`. Les jobs `test` et `build` passent, `deploy` échoue — c'est attendu, les secrets et le script manquent encore.
-2. Sur le serveur : `cd <APP_DIR> && git pull`, puis le `docker login ghcr.io` de l'étape 3 s'il n'a pas été fait.
+2. Sur le serveur, **en `<APP_USER>`** : `cd <APP_DIR> && git pull`, puis le `docker login ghcr.io` de l'étape 3 s'il n'a pas été fait.
 3. Installer la clé publique dans `authorized_keys` (ci-dessus), maintenant que le chemin du script est valide.
 4. Ajouter les trois secrets du dépôt.
 5. Relancer le workflow : onglet **Actions** → `deploy` → *Run workflow*. Tout doit être vert.
 
-Vérification depuis la machine de dev, une fois ces étapes faites : `ssh -i ~/.ssh/engagement-deploy root@<IP>` doit lancer le déploiement, et refuser toute autre commande.
+Vérification depuis la machine de dev, une fois ces étapes faites : `ssh -i ~/.ssh/engagement-deploy <APP_USER>@<IP>` doit lancer le déploiement, et refuser toute autre commande.
 
 ## Mettre à jour
 
@@ -237,3 +254,4 @@ Tant que cette ligne est dans le `.env`, **les déploiements automatiques resten
 
 - **Pas de certificat :** vérifier que les ports 80 et 443 sont ouverts, puis regarder `docker compose logs server`. Avec sslip.io, les quotas Let's Encrypt sont partagés entre tous ses utilisateurs : en cas d'erreur `rateLimited`, réessayer plus tard.
 - **L'app ne démarre pas :** lancer `docker compose logs app`. Une variable obligatoire manquante est indiquée explicitement.
+- **fail2ban ne démarre pas, `Have not found any log file` :** `/var/log/caddy/access.log` n'existe pas. Vérifier que Caddy tourne avec le dossier de logs monté : `docker compose exec server ls /var/log/caddy` doit lister `access.log`. Sinon, recréer le conteneur avec la config à jour : `docker compose up -d --force-recreate server` (coupure de quelques secondes, le certificat est conservé). Puis `sudo systemctl restart fail2ban`.
