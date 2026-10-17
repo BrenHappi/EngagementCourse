@@ -90,6 +90,7 @@
 								<th>Email</th>
 								<th>Catégorie</th>
 								<th>Role</th>
+								<th>Catégories gérées</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
@@ -98,24 +99,24 @@
 								{% set form_id = 'update-user-' ~ user.user_id %}
 								{% set category_key = (user.category.level ~ '_' ~ user.category.number) if user.category else '' %}
 								<tr class="user-row" data-form-id="{{ form_id }}">
-									<td>{{ user.user_id }}</td>
-									<td>
+									<td data-label="ID">{{ user.user_id }}</td>
+									<td data-label="Prénom">
 										<span class="cell-text js-display">{{ user.firstname }}</span>
 										<input class="js-editor js-editable" form="{{ form_id }}" name="firstname" type="text" value="{{ user.firstname }}" disabled hidden>
 									</td>
-									<td>
+									<td data-label="Nom">
 										<span class="cell-text js-display">{{ user.lastname }}</span>
 										<input class="js-editor js-editable" form="{{ form_id }}" name="lastname" type="text" value="{{ user.lastname }}" disabled hidden>
 									</td>
-									<td>
+									<td data-label="Username">
 										<span class="cell-text js-display">{{ user.username }}</span>
 										<input class="js-editor js-editable" form="{{ form_id }}" name="username" type="text" value="{{ user.username }}" disabled hidden>
 									</td>
-									<td>
+									<td data-label="Email">
 										<span class="cell-text js-display">{{ user.email }}</span>
 										<input class="js-editor js-editable" form="{{ form_id }}" name="email" type="email" value="{{ user.email }}" disabled hidden>
 									</td>
-									<td>
+									<td data-label="Catégorie">
 										<span class="cell-text js-display">{{ category_key if category_key else 'Aucune' }}</span>
 										<select class="js-editor js-editable" form="{{ form_id }}" name="category" disabled hidden>
 											<option value="" {% if not category_key %}selected{% endif %}>Aucune</option>
@@ -127,14 +128,35 @@
 											{% endfor %}
 										</select>
 									</td>
-									<td>
+									<td data-label="Role">
 										<span class="cell-text js-display">{{ user.role }}</span>
 										<select class="js-editor js-editable" form="{{ form_id }}" name="role" disabled hidden>
 											<option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
 											<option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
 										</select>
 									</td>
-									<td>
+									<td data-label="Catégories gérées">
+										<span class="cell-text js-display">
+											{% if user.role == 'admin' and user.managed_categories %}
+												{% for managed in user.managed_categories %}<span class="cat-tag" title="{{ managed.level }} {{ managed.number }}">{{ managed.level[0] }}{{ managed.number }}</span>{% endfor %}
+											{% else %}
+												—
+											{% endif %}
+										</span>
+										<fieldset class="managed-editor js-editor" disabled hidden>
+											<input form="{{ form_id }}" type="hidden" name="managed_categories_submitted" value="1">
+											{% for level, numbers in available_category_filters.items() %}
+												{% for number in numbers %}
+													{% set is_managed = (user.managed_categories or [])|selectattr('level', 'equalto', level)|selectattr('number', 'equalto', number)|list %}
+													<label class="checkbox-pill checkbox-pill-compact" title="{{ level }} {{ number }}">
+														<input form="{{ form_id }}" type="checkbox" name="managed_categories" value="{{ level }}_{{ number }}" {% if is_managed %}checked{% endif %}>
+														<span>{{ level[0] }}{{ number }}</span>
+													</label>
+												{% endfor %}
+											{% endfor %}
+										</fieldset>
+									</td>
+									<td data-label="Actions">
 										<div class="actions compact-actions">
 											<form id="{{ form_id }}" method="post" action="{{ update_user_url }}">
 												<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -180,12 +202,12 @@
 						</tbody>
 						<tfoot>
 							<tr class="create-row">
-								<td>+</td>
-								<td><input form="create-user-inline" name="firstname" type="text" required placeholder="Prénom"></td>
-								<td><input form="create-user-inline" name="lastname" type="text" required placeholder="Nom"></td>
-								<td><input form="create-user-inline" name="username" type="text" placeholder="auto"></td>
-								<td><input form="create-user-inline" name="email" type="email" required placeholder="email"></td>
-								<td>
+								<td data-label="Nouveau">+</td>
+								<td data-label="Prénom"><input form="create-user-inline" name="firstname" type="text" required placeholder="Prénom"></td>
+								<td data-label="Nom"><input form="create-user-inline" name="lastname" type="text" required placeholder="Nom"></td>
+								<td data-label="Username"><input form="create-user-inline" name="username" type="text" placeholder="auto"></td>
+								<td data-label="Email"><input form="create-user-inline" name="email" type="email" required placeholder="email"></td>
+								<td data-label="Catégorie">
 									<select form="create-user-inline" name="category">
 										<option value="" selected>Aucune</option>
 										{% for level, numbers in available_category_filters.items() %}
@@ -195,15 +217,29 @@
 										{% endfor %}
 									</select>
 								</td>
-								<td>
+								<td data-label="Role">
 									<select form="create-user-inline" name="role">
 										<option value="user" selected>user</option>
 										<option value="admin">admin</option>
 									</select>
 								</td>
-								<td class="compact-actions">
-									<input form="create-user-inline" name="password" type="password" required placeholder="mot de passe">
-									<button class="icon-btn icon-confirm" type="submit" form="create-user-inline" aria-label="Ajouter" title="Ajouter">＋</button>
+								<td data-label="Catégories gérées">
+									<div class="managed-editor">
+										{% for level, numbers in available_category_filters.items() %}
+											{% for number in numbers %}
+												<label class="checkbox-pill checkbox-pill-compact" title="{{ level }} {{ number }} (admins uniquement)">
+													<input form="create-user-inline" type="checkbox" name="managed_categories" value="{{ level }}_{{ number }}">
+													<span>{{ level[0] }}{{ number }}</span>
+												</label>
+											{% endfor %}
+										{% endfor %}
+									</div>
+								</td>
+								<td data-label="Mot de passe">
+									<div class="compact-actions">
+										<input form="create-user-inline" name="password" type="password" required placeholder="mot de passe">
+										<button class="icon-btn icon-confirm" type="submit" form="create-user-inline" aria-label="Ajouter" title="Ajouter">＋</button>
+									</div>
 								</td>
 							</tr>
 						</tfoot>

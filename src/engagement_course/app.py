@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_login import LoginManager
@@ -11,6 +14,7 @@ from engagement_course.profile import profile_bp
 from engagement_course.database import DatabaseRepository
 from engagement_course.ffc_parser import FFCParser
 from engagement_course.models import Category, CATEGORIES
+from engagement_course.recap import send_due_recaps
 import engagement_course.config as config
 
 lm = LoginManager()
@@ -96,6 +100,15 @@ def create_app() -> Flask:
         """Fetch races from all configured FFC departments and replace DB races."""
         seeded_count = seed_races_from_ffc(db, force=True)
         print(f"Seeded {seeded_count} races from FFC")
+
+    @app.cli.command("send-admin-recaps")
+    def send_admin_recaps_command() -> None:
+        """Email admins whose weekly recap is due (meant to run every hour from cron)."""
+        if not app.config['notify']:
+            print("SMTP not configured: no recap sent")
+            return
+        sent_count = send_due_recaps(db, datetime.now(ZoneInfo(config.TIMEZONE)), config.EXTERNAL_URL)
+        print(f"Sent {sent_count} admin recap(s)")
 
     @app.get("/health")
     def health():

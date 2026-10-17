@@ -148,6 +148,25 @@
 							</div>
 							<p class="profile-field-help">Cliquez sur les catégories à gérer. Tout effacer retire toute sélection.</p>
 						</div>
+
+						<div class="field field-span-2">
+							<span class="profile-field-label">Récap hebdomadaire par email</span>
+							<label class="checkbox-pill profile-recap-toggle" for="profile-recap_enabled">
+								{{ profile_form.recap_enabled(id="profile-recap_enabled") }}
+								<span>{{ profile_form.recap_enabled.label.text }}</span>
+							</label>
+							<div class="profile-recap-schedule">
+								<div class="field">
+									<label for="profile-recap_weekday">Jour</label>
+									{{ profile_form.recap_weekday(id="profile-recap_weekday") }}
+								</div>
+								<div class="field">
+									<label for="profile-recap_hour">Heure</label>
+									{{ profile_form.recap_hour(id="profile-recap_hour") }}
+								</div>
+							</div>
+							<p class="profile-field-help">Envoyé seulement s'il reste des demandes en attente dans vos catégories pour le week-end qui suit.</p>
+						</div>
 					{% endif %}
 				</div>
 

@@ -314,3 +314,17 @@ class Engagement:
 
     def __repr__(self):
         return f"Engagement(id={self.id}, user={self.user}, race={self.race}, status='{self.status}')"
+
+WEEKDAY_LABELS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+
+class RecapSettings:
+    """Schedule of the weekly email listing the pending engagements an admin has to validate."""
+    DEFAULT_WEEKDAY = 1  # Tuesday (Monday is 0, as in date.weekday())
+    DEFAULT_HOUR = 19
+
+    def __init__(self, enabled: bool = True, weekday: int = DEFAULT_WEEKDAY, hour: int = DEFAULT_HOUR, last_sent_on: Optional[date] = None):
+        self.enabled = enabled
+        self.weekday = weekday
+        self.hour = hour
+        self.last_sent_on = last_sent_on

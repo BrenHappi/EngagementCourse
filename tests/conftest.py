@@ -59,7 +59,7 @@ def sent_emails(monkeypatch):
         sent.append({"to": to_address, "subject": subject, "message": message})
         return True
 
-    for module in ("api", "admin", "auth"):
+    for module in ("api", "admin", "auth", "recap"):
         monkeypatch.setattr(f"engagement_course.{module}.send_email", fake_send_email)
     return sent
 

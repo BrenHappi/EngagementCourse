@@ -192,6 +192,10 @@ img {
     flex-wrap: wrap;
 }
 
+.topbar-actions {
+    flex-wrap: nowrap;
+}
+
 .pill-link {
     padding: 0.55rem 0.9rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -681,10 +685,22 @@ a:focus-visible {
 
 .panel-title-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
+}
+
+.panel-title-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    align-items: center;
+}
+
+.panel-title-actions .button-secondary {
+    white-space: nowrap;
 }
 
 .race-search-row {
@@ -959,6 +975,17 @@ textarea:focus {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 0.6rem;
+}
+
+.profile-recap-toggle {
+    cursor: pointer;
+    color: var(--text);
+}
+
+.profile-recap-schedule {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
 }
 
 .profile-choice-chip {
@@ -1623,7 +1650,7 @@ th {
 .admin-users-table input,
 .admin-users-table select {
     width: 100%;
-    min-width: 7rem;
+    min-width: 5.5rem;
     padding: 0.38rem 0.48rem;
     border-radius: 8px;
     border: 1px solid rgba(123, 198, 255, 0.24);
@@ -1637,6 +1664,28 @@ th {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.managed-editor {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    max-width: 14rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.managed-editor .checkbox-pill-compact {
+    padding: 0.3rem 0.45rem;
+    cursor: pointer;
+}
+
+.admin-users-table .managed-editor input[type="checkbox"] {
+    width: auto;
+    min-width: 0;
+    padding: 0;
 }
 
 .compact-actions {
@@ -1679,7 +1728,8 @@ th {
 }
 
 .icon-btn[hidden],
-.compact-actions [hidden] {
+.compact-actions [hidden],
+.admin-users-table [hidden] {
     display: none !important;
 }
 
@@ -2174,6 +2224,8 @@ tbody tr:hover {
 @media (max-width: 680px) {
     .site-shell {
         padding: 0.8rem;
+        /* Room to scroll the last controls out from under the floating to-top button */
+        padding-bottom: 4.5rem;
     }
 
     .hero,
@@ -2183,34 +2235,52 @@ tbody tr:hover {
         padding: 1.1rem;
     }
 
-    .registration-link-row {
-        grid-template-columns: 1fr;
+    .topbar {
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        padding: 0.75rem;
+        margin-bottom: 0.9rem;
     }
 
-    .brand-mark {
-        width: 42px;
-        height: 42px;
+    .brand-kicker,
+    .brand-subtitle {
+        display: none;
+    }
+
+    .brand-title {
+        font-size: 1.05rem;
     }
 
     .brand-mark img:first-child {
-        width: 42px;
-        height: 42px;
+        width: 38px;
+        height: 38px;
     }
 
     .brand-mark img:last-child {
-        width: 18px;
-        height: 18px;
-        right: -5px;
-        bottom: -3px;
+        width: 16px;
+        height: 16px;
     }
 
     .topbar-actions {
         width: 100%;
-        justify-content: space-between;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
     }
 
     .topbar-nav {
         flex: 1 1 auto;
+        min-width: 0;
+        gap: 0.5rem;
+    }
+
+    .topbar-nav .pill-link {
+        padding: 0.55rem 0.75rem;
+        white-space: nowrap;
+    }
+
+    .icon-btn.icon-toolbar {
+        width: 2.6rem;
+        height: 2.6rem;
     }
 
     .profile-summary-card {
@@ -2688,4 +2758,312 @@ tbody tr:hover {
     .race-table-wrap { padding: 0 0.75rem 1.5rem; }
     .col-fed, .col-type { display: none; }
     .cal-month-label { min-width: 9rem; font-size: 1rem; }
+}
+
+/* ── Mobile: touch-sized controls, stacked filters ────────────────── */
+@media (max-width: 680px) {
+    /* Fixed backgrounds repaint badly on mobile browsers */
+    body {
+        background-attachment: scroll;
+    }
+
+    /* 16px avoids the automatic zoom on input focus in iOS Safari */
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+
+    .cal-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        padding: 0.25rem 0.25rem 0.9rem;
+    }
+
+    .cal-month-nav {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        margin: 0;
+        justify-content: space-between;
+    }
+
+    .cal-header-right {
+        margin-left: 0;
+    }
+
+    .cal-nav-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+        font-size: 1.15rem;
+    }
+
+    .cal-month-label {
+        min-width: 0;
+        font-size: 1.1rem;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+        padding: 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+    }
+
+    .filter-bar-sep {
+        display: none;
+    }
+
+    /* Label in a gutter so wrapped chips line up with the first one */
+    .filter-bar-group {
+        gap: 0.4rem;
+        padding-left: 3.2rem;
+    }
+
+    .filter-bar-label {
+        width: 2.8rem;
+        margin-left: -3.2rem;
+    }
+
+    .chip-toggle {
+        padding: 0.45rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .distance-slider-wrap {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .distance-slider {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    .distance-slider-value {
+        min-width: 0;
+    }
+
+    .filter-bar-hint {
+        margin-left: 0;
+    }
+}
+
+/* Admin users table: one card per user, label in front of each value */
+@media (max-width: 1240px) {
+    .admin-users-table,
+    .admin-users-table tbody,
+    .admin-users-table tfoot,
+    .admin-users-table tr {
+        display: block;
+        min-width: 0;
+    }
+
+    .admin-users-table thead {
+        display: none;
+    }
+
+    .admin-users-table tr {
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .admin-users-table td {
+        display: grid;
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0;
+        border-bottom: 0;
+        background: none;
+    }
+
+    .admin-users-table td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .admin-users-table th:last-child,
+    .admin-users-table td:last-child {
+        width: auto;
+    }
+
+    .admin-users-table .cell-text {
+        max-width: none;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-users-table input,
+    .admin-users-table select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .create-row .compact-actions input[name="password"] {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    .admin-users-table .icon-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .create-row {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+/* Tablets and phones in landscape: the tables no longer fit, show cards */
+@media (max-width: 960px) {
+    .topbar-nav {
+        flex-wrap: nowrap;
+    }
+
+    .topbar-nav .pill-link {
+        white-space: nowrap;
+    }
+
+    /* Race table: one card per race */
+    .race-table-wrap {
+        padding: 0.9rem 0 1.5rem;
+        overflow: visible;
+    }
+
+    .race-table {
+        display: block;
+        min-width: 0;
+        font-size: 0.9rem;
+    }
+
+    .race-table thead {
+        display: none;
+    }
+
+    .race-table tbody {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+        gap: 0.6rem;
+    }
+
+    .race-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem 0.5rem;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid var(--border);
+        border-left-width: 3px;
+        border-radius: var(--radius-md);
+        background: var(--panel);
+    }
+
+    .race-table td {
+        display: block;
+        padding: 0;
+        border-bottom: 0;
+        min-width: 0;
+        width: auto;
+    }
+
+    /* The card border already shows the status */
+    .race-table .col-fed,
+    .race-table .col-type,
+    .race-table .col-status,
+    .race-table .pax-none {
+        display: none;
+    }
+
+    .race-row-pending { border-left-color: #f0b429; }
+    .race-row-validated { border-left-color: var(--success); }
+    .race-row-interested { border-left-color: var(--accent); }
+    .race-row-cancelled { border-left-color: var(--danger); }
+
+    .race-table .race-row td:first-child {
+        border-left: 0;
+    }
+
+    .race-table .col-date {
+        order: 1;
+        flex: 1 1 auto;
+    }
+
+    .race-table .col-actions {
+        order: 2;
+        display: flex;
+        gap: 0.4rem;
+    }
+
+    .race-table .col-loc {
+        order: 4;
+        flex: 1 0 100%;
+        font-size: 1rem;
+    }
+
+    .race-table .col-distance {
+        order: 5;
+        text-align: left;
+    }
+
+    .race-table .col-cat {
+        order: 6;
+        white-space: normal;
+    }
+
+    .race-table .col-pax {
+        order: 7;
+        margin-left: auto;
+    }
+
+    .race-distance-value {
+        min-width: 0;
+        font-size: 0.8rem;
+    }
+
+    .pax-chip {
+        padding: 0.2rem 0.45rem;
+        font-size: 0.8rem;
+    }
+
+    /* Tapping a chip focuses it: keep the popover inside the card */
+    .pax-popover {
+        left: auto;
+        right: 0;
+        transform: none;
+    }
+
+    .action-btn {
+        width: 2.6rem;
+        height: 2.6rem;
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .topbar {
+        padding: 0.6rem;
+    }
+
+    .topbar-actions,
+    .topbar-nav {
+        gap: 0.4rem;
+    }
+
+    .topbar-nav .pill-link {
+        padding: 0.5rem 0.45rem;
+        font-size: 0.8rem;
+    }
+
+    .icon-btn.icon-toolbar {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 }

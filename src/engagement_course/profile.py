@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, abort, request, flash, redirect, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, SelectField, StringField, SelectMultipleField, SubmitField
+from wtforms import BooleanField, PasswordField, SelectField, StringField, SelectMultipleField, SubmitField
 from wtforms.validators import Optional, DataRequired
 from engagement_course.utils import get_db
-from engagement_course.models import Category
+from engagement_course.models import Category, RecapSettings, WEEKDAY_LABELS
 
 profile_bp = Blueprint("profile", __name__)
 
@@ -23,6 +23,21 @@ class UpdateProfileForm(FlaskForm):
                             validators=[Optional()]
             )
     address = StringField("Adresse", validators=[Optional()])
+    recap_enabled = BooleanField("Recevoir le récap des inscriptions à valider pour le week-end")
+    recap_weekday = SelectField(
+                            "Jour",
+                            choices=list(enumerate(WEEKDAY_LABELS)),
+                            coerce=int,
+                            default=RecapSettings.DEFAULT_WEEKDAY,
+                            validators=[Optional()]
+                        )
+    recap_hour = SelectField(
+                            "Heure",
+                            choices=[(hour, f"{hour}h") for hour in range(6, 24)],
+                            coerce=int,
+                            default=RecapSettings.DEFAULT_HOUR,
+                            validators=[Optional()]
+                        )
     current_password = PasswordField("Mot de passe actuel", validators=[Optional()])
     new_password = PasswordField("Nouveau mot de passe", validators=[Optional()])
     confirm_password = PasswordField("Confirmer le nouveau mot de passe", validators=[Optional()])
@@ -47,6 +62,10 @@ def profile():
         category.to_key() for category in (user.managed_categories or [])
     ]
     profile_form.address.data = user.address or ""
+    recap_settings = db.get_recap_settings(user.user_id)
+    profile_form.recap_enabled.data = recap_settings.enabled
+    profile_form.recap_weekday.data = recap_settings.weekday
+    profile_form.recap_hour.data = recap_settings.hour
     
     if request.method == "POST":
         profile_form = UpdateProfileForm(prefix="profile")
@@ -87,6 +106,13 @@ def profile():
                     address=address,
                     password=new_password if password_change_requested and new_password else None
                 )
+                if user.role == "admin":
+                    db.update_recap_settings(
+                        user.user_id,
+                        enabled=profile_form.recap_enabled.data,
+                        weekday=profile_form.recap_weekday.data,
+                        hour=profile_form.recap_hour.data,
+                    )
                 flash("Utilisateur mis à jour avec succès")
                 return redirect(url_for("profile.profile"))
 

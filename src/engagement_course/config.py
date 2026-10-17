@@ -21,6 +21,9 @@ SQLITE_DB_PATH = "data/sqlite.db"
 
 DATE_FORMAT = "%d/%m/%Y"
 
+# Admin recap emails are scheduled in club local time, whatever the server timezone
+TIMEZONE = "Europe/Paris"
+
 PASSWORD_RESET_MAX_AGE = 3600  # seconds
 
 # SMTP configuration

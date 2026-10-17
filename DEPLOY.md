@@ -83,6 +83,8 @@ Au premier démarrage, la base est créée et les courses FFC importées.
 30 2 * * * cd <APP_DIR> && docker compose exec -T app flask seed-races >> /var/log/engagement-seed.log 2>&1
 # Sauvegarde SQLite (data/backups/, 14 jours conservés)
 0 3 * * * <APP_DIR>/scripts/backup_db.sh >> /var/log/engagement-backup.log 2>&1
+# Récap hebdomadaire des admins : chaque admin choisit jour et heure (heure de Paris) dans son profil
+5 * * * * cd <APP_DIR> && docker compose exec -T app flask send-admin-recaps >> /var/log/engagement-recap.log 2>&1
 ```
 
 Les sauvegardes restent sur le serveur. Pour en avoir une copie ailleurs, les rapatrier régulièrement :

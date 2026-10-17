@@ -19,6 +19,12 @@ Rafraîchir les courses depuis le calendrier FFC :
 docker compose exec app flask seed-races
 ```
 
+Envoyer les récaps hebdomadaires des admins dont l'heure est passée (à lancer toutes les heures, voir DEPLOY.md) :
+
+```bash
+docker compose exec app flask send-admin-recaps
+```
+
 ## Tests
 
 ```bash

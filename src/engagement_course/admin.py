@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, current_app, abort, request, flash, redirect, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
-from wtforms import HiddenField, PasswordField, SelectField, StringField
+from wtforms import HiddenField, PasswordField, SelectField, SelectMultipleField, StringField
 from wtforms.validators import DataRequired, Optional
 from engagement_course.mail import send_email
 from engagement_course.utils import get_db
@@ -18,6 +18,7 @@ class AdminCreateUserForm(FlaskForm):
     address = StringField(validators=[Optional()])
     category = SelectField(validators=[Optional()])
     role = SelectField(choices=[("user", "User"), ("admin", "Admin")], validators=[DataRequired()])
+    managed_categories = SelectMultipleField(choices=Category.get_category_options(), validators=[Optional()])
 
 class AdminUpdateUserForm(FlaskForm):
     user_id = HiddenField(validators=[DataRequired()])
@@ -28,6 +29,9 @@ class AdminUpdateUserForm(FlaskForm):
     address = StringField(validators=[Optional()])
     category = SelectField(validators=[Optional()])
     role = SelectField(choices=[("user", "User"), ("admin", "Admin")], validators=[Optional()])
+    managed_categories = SelectMultipleField(choices=Category.get_category_options(), validators=[Optional()])
+    # Unchecking every box sends no managed_categories at all: this marker tells "cleared" from "not edited"
+    managed_categories_submitted = HiddenField()
 
 class AdminDeleteUserForm(FlaskForm):
     user_id = HiddenField(validators=[DataRequired()])
@@ -107,6 +111,7 @@ def manage_users():
                     if role.lower() not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
 
+                    managed_categories = [Category.from_key(key) for key in form.managed_categories.data]
                     db.create_user(
                         email=email,
                         username=username,
@@ -115,6 +120,7 @@ def manage_users():
                         lastname=lastname,
                         category=category,
                         role=role.lower(),
+                        managed_categories=managed_categories if role.lower() == "admin" else None,
                         address=address,
                     )
                     flash("Utilisateur créé avec succès")
@@ -148,6 +154,10 @@ def manage_users():
                     if role not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
 
+                    managed_categories = None
+                    if form.managed_categories_submitted.data and (role or user.role) == "admin":
+                        managed_categories = [Category.from_key(key) for key in form.managed_categories.data]
+
                     db.update_user(
                         user_id=user_id,
                         email=email,
@@ -157,7 +167,7 @@ def manage_users():
                         address=address,
                         category=category,
                         role=role.lower() if role else None,
-                        managed_categories=None
+                        managed_categories=managed_categories
                     )
                     flash(f"Utilisateur {user_id} ({username}) mis à jour avec succès")
                     return redirect(url_for("admin.manage_users"))

@@ -2,9 +2,9 @@ import secrets
 import sqlite3
 from bcrypt import hashpw, gensalt
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime
 from engagement_course.config import SQLITE_DB_PATH
-from engagement_course.models import CATEGORY_FREE_RACE_TYPES, merge_cyclocross_events, normalize_location, Category, RaceEvent, RaceFilter, User, Engagement
+from engagement_course.models import CATEGORY_FREE_RACE_TYPES, merge_cyclocross_events, normalize_location, Category, RaceEvent, RaceFilter, RecapSettings, User, Engagement
 
 
 class DatabaseRepository:
@@ -102,6 +102,19 @@ class DatabaseRepository:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
+            )
+            # No row means the defaults: recap enabled, Tuesday evening
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS admin_recap_settings (
+                    user_id INTEGER PRIMARY KEY,
+                    enabled INTEGER NOT NULL,
+                    weekday INTEGER NOT NULL,
+                    hour INTEGER NOT NULL,
+                    last_sent_on TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """
             )
             conn.execute(
                 """
@@ -722,6 +735,7 @@ class DatabaseRepository:
                 username=row["username"],
                 password_hash=row["password"],
                 category=Category.from_key(row["category_key"]) if row["category_key"] else None,
+                managed_categories=[Category.from_key(key) for key in row["managed_categories"].split(",")] if row["managed_categories"] else None,
                 firstname=row["firstname"],
                 lastname=row["lastname"],
                 role=row["role"],
@@ -822,6 +836,49 @@ class DatabaseRepository:
             address_lat=row["address_lat"],
             address_lon=row["address_lon"]
         )
+
+
+    def get_recap_settings(self, user_id: int) -> RecapSettings:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT enabled, weekday, hour, last_sent_on FROM admin_recap_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+
+        if row is None:
+            return RecapSettings()
+
+        return RecapSettings(
+            enabled=bool(row["enabled"]),
+            weekday=row["weekday"],
+            hour=row["hour"],
+            last_sent_on=date.fromisoformat(row["last_sent_on"]) if row["last_sent_on"] else None,
+        )
+
+
+    def update_recap_settings(self, user_id: int, enabled: bool, weekday: int, hour: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_recap_settings (user_id, enabled, weekday, hour)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET enabled = excluded.enabled, weekday = excluded.weekday, hour = excluded.hour
+                """,
+                (user_id, int(enabled), weekday, hour),
+            )
+
+
+    def mark_recap_sent(self, user_id: int, sent_on: date) -> None:
+        defaults = RecapSettings()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_recap_settings (user_id, enabled, weekday, hour, last_sent_on)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET last_sent_on = excluded.last_sent_on
+                """,
+                (user_id, int(defaults.enabled), defaults.weekday, defaults.hour, sent_on.isoformat()),
+            )
 
 
     def get_manager_for_category(self, category: Category) -> User | None:
