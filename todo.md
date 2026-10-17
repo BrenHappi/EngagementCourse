@@ -47,7 +47,7 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 ~~1. Profil utilisateur~~
 2. Parser le détail des courses
 ~~3. Add filters: Filtrer les courses sur les inscrits, filtrer sur mes courses~~
-4. Reset de mot de passe / envoyer un lien de réinitialisation de mot de passe
+~~4. Reset de mot de passe / envoyer un lien de réinitialisation de mot de passe~~
 
 ### V3
 ~~1. API Google map et calcul distance des courses depuis pos actuelle~~
@@ -55,33 +55,30 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 3. Synchroniser avec google calendar
 4. Ajout d'équipiers favoris pour savoir où on va
 
-Le système de filtre actuel n'est pas très performant et pas très pratique. à la place:
-- faire une vue mois par mois
-<!-- - filtre par distance à notre domicile/temps de route -->
-- affichage beaucoup plus compact, quasi sous forme de tableau pour voir toute les courses 
-
-
 # Mise en prod
 
 ### Bloquants
 - Secrets: rotation du mot de passe SMTP (déjà exposé), `SECRET_KEY` long et aléatoire, vrai mot de passe admin (à changer depuis le profil si la DB existe déjà, `ADMIN_PASSWORD` n'est lu qu'à la création du compte)
 - Caddyfile: domaine public + TLS (retirer `auto_https off`, ouvrir le port 443 dans le compose)
 - `EXTERNAL_URL` = URL publique dans le `.env` du serveur
-- Dockerfile: mettre à jour / pinner l'image de base (vulnérabilités signalées)
+- ~~Dockerfile: image de base pinnée (`python:3.12.15-slim-trixie` + digest)~~
 - ~~Validation de la config au démarrage (`SECRET_KEY`, `EXTERNAL_URL`, admin)~~
 
 ### Très important
-- Seed FFC: retirer le seed du démarrage (lancé par chacun des 4 workers), passer par `flask seed-races` en cronjob → couvre aussi "Refresh les calendriers à intervalles régulier"
+- Seed FFC: cronjob `docker compose exec app flask seed-races` pour rafraîchir les courses → couvre "Refresh les calendriers à intervalles régulier" (au boot le seed ne tourne plus qu'une fois grâce à `gunicorn --preload`, et seulement si la DB est vide)
 - Backups SQLite: cronjob `sqlite3 .backup` quotidien + rotation + copie hors serveur, tester une restauration
-- Reset de mot de passe par email (V2 #4): indispensable avec l'inscription en libre-service
+- ~~Reset de mot de passe par email (lien signé, valable 1h, usage unique)~~
+- ~~Démarrage gunicorn: 4 workers créaient l'admin en parallèle sur DB vide → crash au premier boot (corrigé par `--preload`)~~
 - ~~Robustesse email: timeout SMTP, un échec d'envoi ne casse plus l'action (log + message à l'admin)~~
 - ~~Création d'engagement en 500 si aucun responsable pour la catégorie~~
 - ~~Lien d'inscription: token stocké en DB (partagé entre workers, survit aux redémarrages), régénérable depuis l'admin~~
 
 ### Important
-- Healthcheck: route `/health` + `healthcheck` sur `app` dans le compose
-- Tests: aucun pour l'instant. Priorité: règles d'engagement (J-5, catégorie, droits) et parser FFC
-- Logs: niveau configurable, format exploitable
+- Logs: format structuré / centralisation si besoin une fois en prod
+- Tests: étendre au calendrier (filtres), au profil et à l'admin utilisateurs
+- ~~Healthcheck: route `/health` + `healthcheck` compose, Caddy attend que l'app soit healthy~~
+- ~~Tests: suite pytest (config, inscription, engagements, reset mot de passe, parser FFC)~~
+- ~~Logs: niveau configurable via `LOG_LEVEL`~~
 - ~~`restart: unless-stopped`~~
 - ~~Séparation dev/prod: profils compose (`--profile dev` / `--profile prod`), override supprimé~~
 - ~~`data/` exclu de l'image Docker~~
