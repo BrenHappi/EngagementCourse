@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
@@ -32,6 +32,7 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
 def create_app() -> Flask:
     config.validate()
     app = Flask(__name__, static_folder="assets")
+    app.logger.setLevel(config.LOG_LEVEL)
     app.secret_key = config.SECRET_KEY
     csrf.init_app(app)
     db = DatabaseRepository()
@@ -85,6 +86,12 @@ def create_app() -> Flask:
         """Fetch races from all configured FFC departments and replace DB races."""
         seeded_count = seed_races_from_ffc(db, force=True)
         print(f"Seeded {seeded_count} races from FFC")
+
+    @app.get("/health")
+    def health():
+        if not db.ping():
+            return jsonify({"status": "error", "database": "unavailable"}), 503
+        return jsonify({"status": "ok"}), 200
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calendar_bp)

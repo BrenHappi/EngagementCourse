@@ -7,7 +7,7 @@ name = "engagement-course"
 version = "0.1.0"
 description = "Club course registration app with FFC calendar parsing"
 authors = [{name = "ASPTT"}]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "requests>=2.28.0",
     "beautifulsoup4>=4.11.0",

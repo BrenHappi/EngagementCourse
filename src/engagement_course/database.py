@@ -154,6 +154,15 @@ class DatabaseRepository:
                 )
 
 
+    def ping(self) -> bool:
+        try:
+            with self._connect() as conn:
+                conn.execute("SELECT 1").fetchone()
+            return True
+        except sqlite3.Error:
+            return False
+
+
     def get_registration_token(self) -> str:
         """Returns the registration token, creating it on first call (shared by all workers)."""
         with self._connect() as conn:
