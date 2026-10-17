@@ -17,6 +17,17 @@ FFC_CALENDAR_URLS = {
     56: "https://www.cyclisme-amateur.com/courses-morbihan.html",   
 }
 
+DEPARTMENT_NAMES = {
+    22: "Côtes-d'Armor",
+    35: "Ille-et-Vilaine",
+    44: "Loire-Atlantique",
+    53: "Mayenne",
+    56: "Morbihan",
+}
+
+# Riders can ask for an engagement until this many days before the race
+ENGAGEMENT_CLOSING_DAYS = 5
+
 SQLITE_DB_PATH = "data/sqlite.db"
 
 DATE_FORMAT = "%d/%m/%Y"

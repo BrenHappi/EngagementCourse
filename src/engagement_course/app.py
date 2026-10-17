@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 
 from engagement_course.auth import auth_bp
@@ -13,7 +13,7 @@ from engagement_course.api import api_bp
 from engagement_course.profile import profile_bp
 from engagement_course.database import DatabaseRepository
 from engagement_course.ffc_parser import FFCParser
-from engagement_course.models import Category, CATEGORIES
+from engagement_course.models import Category, CATEGORIES, EngagementStatus
 from engagement_course.recap import send_due_recaps
 import engagement_course.config as config
 
@@ -90,6 +90,8 @@ def create_app() -> Flask:
 
     lm.init_app(app)
     lm.login_view = "auth.login"
+    lm.login_message = "Connectez-vous pour accéder à cette page"
+    lm.login_message_category = "info"
 
     @lm.user_loader
     def load_user(user_id: str):
@@ -109,6 +111,14 @@ def create_app() -> Flask:
             return
         sent_count = send_due_recaps(db, datetime.now(ZoneInfo(config.TIMEZONE)), config.EXTERNAL_URL)
         print(f"Sent {sent_count} admin recap(s)")
+
+    @app.context_processor
+    def inject_pending_count():
+        # Badge of the "Validation" menu entry: requests waiting in the admin's categories
+        if not current_user.is_authenticated or current_user.role != "admin":
+            return {}
+        categories = current_user.managed_categories or []
+        return {"pending_count": len(db.list_engagements(status=EngagementStatus.PENDING.value, categories=categories))}
 
     @app.get("/health")
     def health():

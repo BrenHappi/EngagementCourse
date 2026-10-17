@@ -12,6 +12,7 @@ class UpdateProfileForm(FlaskForm):
     firstname = StringField("Prénom", validators=[Optional()])
     lastname = StringField("Nom", validators=[Optional()])
     username = StringField("Nom d'utilisateur", validators=[Optional()])
+    email = StringField("Email", validators=[Optional()])
     category = SelectField(
                             "Catégorie",
                             choices=[("", "Aucune") ] + Category.get_category_options(),
@@ -41,7 +42,7 @@ class UpdateProfileForm(FlaskForm):
     current_password = PasswordField("Mot de passe actuel", validators=[Optional()])
     new_password = PasswordField("Nouveau mot de passe", validators=[Optional()])
     confirm_password = PasswordField("Confirmer le nouveau mot de passe", validators=[Optional()])
-    submit = SubmitField("Sauvegarder")
+    submit = SubmitField("Enregistrer")
 
 class DeleteAccountForm(FlaskForm):
     current_password = PasswordField("Mot de passe actuel", validators=[DataRequired()])
@@ -70,9 +71,10 @@ def profile():
     if request.method == "POST":
         profile_form = UpdateProfileForm(prefix="profile")
         if profile_form.validate_on_submit():
-            firstname = (profile_form.firstname.data).strip() or user.firstname
-            lastname = (profile_form.lastname.data).strip() or user.lastname
-            username = (profile_form.username.data).strip() or user.username
+            firstname = (profile_form.firstname.data or "").strip() or user.firstname
+            lastname = (profile_form.lastname.data or "").strip() or user.lastname
+            username = (profile_form.username.data or "").strip() or user.username
+            email = (profile_form.email.data or "").strip() or user.email
             category = Category.from_key(profile_form.category.data.strip()) if profile_form.category.data else None
             address = (profile_form.address.data or "").strip()
             managed_categories = [
@@ -89,7 +91,13 @@ def profile():
             confirm_password = profile_form.confirm_password.data.strip() if profile_form.confirm_password.data else None
             password_change_requested = any([current_password, new_password, confirm_password])
             
-            if password_change_requested and not current_password:
+            email_owner = db.get_user_by_email(email)
+            username_owner = db.get_user_by_username(username)
+            if email_owner is not None and email_owner.user_id != user.user_id:
+                flash("Cet email est déjà utilisé par un autre compte", "error")
+            elif username_owner is not None and username_owner.user_id != user.user_id:
+                flash("Ce nom d'utilisateur est déjà pris", "error")
+            elif password_change_requested and not current_password:
                 flash("Le mot de passe actuel est requis pour changer le mot de passe", "error")
             elif password_change_requested and not user.verify_password(current_password):
                 flash("Mot de passe actuel incorrect", "error")
@@ -101,6 +109,7 @@ def profile():
                     firstname=firstname,
                     lastname=lastname,
                     username=username,
+                    email=email,
                     category=category if category else None,
                     managed_categories=managed_categories if user.role == "admin" else None,
                     address=address,
@@ -113,10 +122,10 @@ def profile():
                         weekday=profile_form.recap_weekday.data,
                         hour=profile_form.recap_hour.data,
                     )
-                flash("Utilisateur mis à jour avec succès")
+                flash("Vos modifications sont enregistrées")
                 return redirect(url_for("profile.profile"))
 
-    return render_template("profile.html", user=user, profile_form=profile_form)
+    return render_template("profile.html", user=user, profile_form=profile_form, delete_form=DeleteAccountForm())
     
 
 @profile_bp.route("/delete_account", methods=["POST"])

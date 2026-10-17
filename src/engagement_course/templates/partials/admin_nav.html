@@ -1,5 +1,4 @@
-<nav class="admin-switcher" aria-label="menu administration">
-	<a class="admin-switcher-link {% if active_admin_section == 'home' %}is-active{% endif %}" href="{{ url_for('admin.admin') }}">Accueil admin</a>
-	<a class="admin-switcher-link {% if active_admin_section == 'users' %}is-active{% endif %}" href="{{ url_for('admin.manage_users') }}">Gestion des utilisateurs</a>
-	<a class="admin-switcher-link {% if active_admin_section == 'engagements' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements') }}">Validation des courses</a>
+<nav class="tabs tabs-fill" aria-label="Administration">
+	<a class="{% if active_admin_section == 'engagements' %}is-active{% endif %}" href="{{ url_for('admin.manage_engagements') }}">Demandes{% if pending_count %} <span class="count-badge">{{ pending_count }}</span>{% endif %}</a>
+	<a class="{% if active_admin_section == 'users' %}is-active{% endif %}" href="{{ url_for('admin.manage_users') }}">Membres</a>
 </nav>

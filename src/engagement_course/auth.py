@@ -11,7 +11,7 @@ from wtforms.validators import DataRequired, Optional
 from engagement_course import config
 from engagement_course.mail import send_email
 from engagement_course.models import Category, User
-from engagement_course.utils import get_db
+from engagement_course.utils import generate_username, get_db
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -29,6 +29,7 @@ class RegisterForm(FlaskForm):
     category = SelectField(validators=[DataRequired()])
     email = StringField(validators=[DataRequired()])
     password = PasswordField(validators=[DataRequired()])
+    confirm_password = PasswordField(validators=[DataRequired()])
     address = StringField(validators=[Optional()])
 
 
@@ -55,15 +56,24 @@ def login():
 
         user = db.get_user_by_email(email_or_username) or db.get_user_by_username(email_or_username)
         if user and user.verify_password(password):
-            login_user(user)
-            return redirect(url_for('calendar.index'))
+            # Stay signed in on this device: members should not have to log in again each time
+            login_user(user, remember=True)
+            return redirect(_safe_next_url() or url_for('calendar.index'))
 
-        flash("Email ou mot de passe incorrect")
+        flash("Email ou mot de passe incorrect", "error")
 
     elif request.method == 'POST':
-        flash("Veuillez remplir tous les champs obligatoires")
+        flash("Veuillez remplir tous les champs obligatoires", "error")
 
     return render_template('login.html', form=form)
+
+def _safe_next_url() -> str | None:
+    """Page the member wanted before being asked to log in, only if it is on this site."""
+    next_url = request.args.get("next") or ""
+    if next_url.startswith("/") and not next_url.startswith("//") and "\\" not in next_url:
+        return next_url
+    return None
+
 
 @auth_bp.route('/logout', methods=['POST'])
 @login_required
@@ -77,39 +87,39 @@ def register():
 
     db = get_db()
 
-    category_options = [("", "Select a category")] + Category.get_category_options()
+    category_options = [("", "Choisir…")] + Category.get_category_options()
     form = RegisterForm()
     form.category.choices = category_options
 
     if request.method == "GET":
         form.registration_token.data = request.args.get("_t", "")
-        if not has_valid_registration_token(form.registration_token.data):
-            abort(403)
+    if not has_valid_registration_token(form.registration_token.data):
+        abort(403)
 
     if form.validate_on_submit():
-        if not has_valid_registration_token(form.registration_token.data):
-            abort(403)
-
         email = (form.email.data or "").strip()
         password = form.password.data
-        # TODO: add confirm password field
         firstname = (form.firstname.data or "").strip()
         lastname = (form.lastname.data or "").strip()
-        username = (form.username.data or (firstname[0]+lastname).lower()).strip()
+        username = (form.username.data or "").strip() or generate_username(db, firstname, lastname)
         category_key = form.category.data
         category = Category.from_key(category_key)
         address = (form.address.data or "").strip()
 
-        if category is None:
-            flash("Veuillez remplir tous les champs obligatoires")
+        if category is None or not firstname or not lastname:
+            flash("Veuillez remplir tous les champs obligatoires", "error")
+            return render_template("register.html", form=form)
+
+        if password != form.confirm_password.data:
+            flash("Les deux mots de passe ne sont pas identiques", "error")
             return render_template("register.html", form=form)
 
         if db.get_user_by_email(email) is not None:
-            flash("Un compte avec cet email existe déjà")
+            flash("Un compte avec cet email existe déjà", "error")
             return render_template("register.html", form=form)
 
-        if username and db.get_user_by_username(username) is not None:
-            flash("Un compte avec ce nom d'utilisateur existe déjà")
+        if db.get_user_by_username(username) is not None:
+            flash("Un compte avec ce nom d'utilisateur existe déjà", "error")
             return render_template("register.html", form=form)
 
         db.create_user(
@@ -126,7 +136,7 @@ def register():
         return redirect(url_for("auth.login"))
 
     if request.method == "POST":
-        flash("Veuillez remplir tous les champs obligatoires")
+        flash("Veuillez remplir tous les champs obligatoires", "error")
 
     return render_template("register.html", form=form)
 
@@ -162,7 +172,7 @@ def get_user_from_password_reset_token(token: str) -> User | None:
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if not current_app.config['notify']:
-        flash("La réinitialisation par email n'est pas disponible, contactez un administrateur")
+        flash("La réinitialisation par email n'est pas disponible, contactez un administrateur", "error")
         return redirect(url_for('auth.login'))
 
     form = ForgotPasswordForm()
@@ -187,18 +197,18 @@ def forgot_password():
 def reset_password(token: str):
     user = get_user_from_password_reset_token(token)
     if user is None:
-        flash("Ce lien de réinitialisation est invalide ou a expiré")
+        flash("Ce lien de réinitialisation est invalide ou a expiré", "error")
         return redirect(url_for('auth.forgot_password'))
 
     form = ResetPasswordForm()
     if form.validate_on_submit():
         if form.password.data != form.confirm_password.data:
-            flash("Le mot de passe et sa confirmation ne correspondent pas")
+            flash("Le mot de passe et sa confirmation ne correspondent pas", "error")
         else:
             get_db().update_user(user_id=user.user_id, password=form.password.data)
             flash("Votre mot de passe a été modifié, vous pouvez maintenant vous connecter")
             return redirect(url_for('auth.login'))
     elif request.method == 'POST':
-        flash("Veuillez remplir tous les champs obligatoires")
+        flash("Veuillez remplir tous les champs obligatoires", "error")
 
     return render_template('reset_password.html', form=form, token=token)

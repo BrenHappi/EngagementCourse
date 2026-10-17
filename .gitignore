@@ -215,3 +215,6 @@ __marimo__/
 
 # Runtime data (SQLite database and backups)
 data/
+
+# Browser automation output (screenshots, snapshots)
+.playwright-mcp/

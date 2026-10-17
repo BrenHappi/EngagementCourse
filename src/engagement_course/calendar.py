@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 from datetime import datetime, date
 import calendar as cal_module
 from engagement_course.models import RaceFilter, Category, CATEGORIES
-from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT
+from engagement_course.config import FFC_CALENDAR_URLS, DATE_FORMAT, DEPARTMENT_NAMES
 from engagement_course.distance import geocode_address, haversine_from_coordinates
 from engagement_course.utils import get_db
 
@@ -41,6 +41,10 @@ def index():
     _, last_day = cal_module.monthrange(current_year, current_month)
     date_from = datetime(current_year, current_month, 1)
     date_to = datetime(current_year, current_month, last_day)
+    if show_my_engagements:
+        # A member looks for his races: all of them, whatever the month and the filters
+        date_from = None if show_past_races else datetime(now.year, now.month, now.day)
+        date_to = None
 
     prev_month = current_month - 1 if current_month > 1 else 12
     prev_year = current_year if current_month > 1 else current_year - 1
@@ -53,7 +57,11 @@ def index():
     raw_categories = request.args.getlist("category")
     parsed_categories: list[Category] = [c for c in (Category.from_key(k) for k in raw_categories) if c]
 
-    if parsed_categories:
+    if show_my_engagements:
+        categories = None
+        selected_category_keys = [category.to_key() for category in parsed_categories]
+        category_filter_mode = "explicit" if parsed_categories else "none"
+    elif parsed_categories:
         categories = parsed_categories
         selected_category_keys = [category.to_key() for category in parsed_categories]
         category_filter_mode = "explicit"
@@ -88,7 +96,7 @@ def index():
             date_from=date_from,
             date_to=date_to,
             location=request.args.get("location"),
-            department=departments,
+            department=None if show_my_engagements else departments,
             federation=request.args.get("federation"),
             type=request.args.get("type"),
             category=categories,
@@ -161,8 +169,10 @@ def index():
                     race_coordinates[1],
                 )
 
-        if race.distance_km is not None and race.distance_km > max_distance:
+        if not show_my_engagements and race.distance_km is not None and race.distance_km > max_distance:
             continue
+
+        race.is_open = race.is_open_for_engagement(now)
 
         filtered_races.append(race)
 
@@ -174,8 +184,11 @@ def index():
         "home.html",
         username=current_user.username if current_user.is_authenticated else None,
         races=races,
+        today=today,
         now=now.strftime(DATE_FORMAT),
         available_departments=FFC_CALENDAR_URLS.keys(),
+        department_names=DEPARTMENT_NAMES,
+        selected_departments=raw_departments,
         available_category_filters=CATEGORIES,
         selected_category_keys=selected_category_keys,
         category_filter_mode=category_filter_mode,

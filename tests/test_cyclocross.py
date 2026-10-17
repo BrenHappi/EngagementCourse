@@ -154,7 +154,7 @@ def test_admin_engagements_page_shows_cyclocross_label(app, db, create_user, cx_
     client = app.test_client()
     login(client, "admin", ADMIN_PASSWORD)
     html = client.get("/admin/engagements").get_data(as_text=True)
-    assert "GUIPEL" in html and "CYCLO-CROSS" in html
+    assert "Guipel" in html and "Cyclo-cross" in html
 
 
 def test_cyclocross_rows_merged_despite_location_typos(db):

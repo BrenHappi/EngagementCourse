@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, request, jsonify
 from flask_login import current_user, login_required
-from datetime import datetime, timedelta
+from datetime import datetime
 from engagement_course.models import EngagementStatus
 from pydantic import BaseModel, Field
 from engagement_course.utils import get_db
@@ -50,52 +50,65 @@ def create_engagement():
     try:
         payload = CreateEngagementPayload(**raw_json)
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Invalid payload: {e}"}), 400
+        current_app.logger.info("Invalid engagement payload: %s", e)
+        return jsonify({"status": "error", "message": "Demande invalide"}), 400
 
     target_user = db.get_user_by_id(id=payload.user_id)
     if target_user is None:
-        return jsonify({"status": "error", "message": "User not found"}), 404
+        return jsonify({"status": "error", "message": "Utilisateur introuvable"}), 404
 
     if target_user.user_id != current_user.user_id:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
 
     race_id = payload.race_id
     race = db.get_race_by_id(race_id)
     if race is None:
-        return jsonify({"status": "error", "message": "Race not found"}), 404
-    
+        return jsonify({"status": "error", "message": "Course introuvable"}), 404
+
     # Check if the user category is compatible with the race
     if race.requires_category_match and not _race_accepts_user_category(race, target_user.category):
-        return jsonify({"status": "error", "message": "User category not compatible with race"}), 400
-    
-    # Checking that the race is in less than 5 days
-    now = datetime.now()
-    if now + timedelta(days=5) > race.date:
-        return jsonify({"status": "error", "message": "Engagements are closed for this race"}), 400
+        return jsonify({"status": "error", "message": "Cette course n'est pas ouverte à votre catégorie"}), 400
+
+    if not race.is_open_for_engagement(datetime.now()):
+        return jsonify({"status": "error", "message": "Les inscriptions sont closes pour cette course"}), 400
 
     status = _to_engagement_status(payload.status)
     if status is None:
-        return jsonify({"status": "error", "message": "Invalid status"}), 400
+        return jsonify({"status": "error", "message": "Statut invalide"}), 400
     if status == EngagementStatus.VALIDATED:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
 
     try:
         db.create_engagement(user_id=current_user.id, race=race, status=status)
     except ValueError:
-        return jsonify({"status": "error", "message": "Failed to create engagement"}), 400  # Duplicate engagement?
+        return jsonify({"status": "error", "message": "Vous êtes déjà positionné sur cette course"}), 400
 
     if current_app.config['notify'] and status == EngagementStatus.PENDING:
-        manager = db.get_manager_for_category(current_user.category)
-        if manager is None or not manager.email:
-            current_app.logger.warning("No manager to notify for category %s", current_user.category)
-        else:
-            send_email(
-                to_address=manager.email,
-                subject=f"Demande inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}",
-                message=f"Vous avez reçu une nouvelle demande d'inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}. "
-                        f"Veuillez vous connecter sur {current_app.config['external_url']}/admin pour valider ou refuser cette demande."
-            )
+        _notify_manager(db, race)
     return jsonify({"status": "success", "message": "Engagement created successfully"}), 201
+
+
+def _notify_manager(db, race, withdrawal: bool = False) -> None:
+    """Emails the manager of the rider's category about a new request, or a withdrawal from a validated race."""
+    manager = db.get_manager_for_category(current_user.category) if current_user.category else None
+    if manager is None or not manager.email:
+        current_app.logger.warning("No manager to notify for category %s", current_user.category)
+        return
+    rider = f"{current_user.firstname} {current_user.lastname}"
+    category = f" ({current_user.category.label})" if current_user.category else ""
+    race_line = f"la course de {race.display_location} ({race.department_name}) le {race.long_date().lower()} {race.date.year}"
+    if withdrawal:
+        subject = f"Désistement de {rider} à {race.display_location} le {race.display_date()}"
+        body = f"{rider}{category} a annulé sa participation à {race_line}, alors que son inscription était validée."
+    else:
+        subject = f"Demande d'inscription de {rider} à {race.display_location} le {race.display_date()}"
+        body = (f"{rider}{category} demande à être inscrit à {race_line}.\n\n"
+                f"Pour valider ou refuser cette demande : {current_app.config['external_url']}/admin/engagements")
+    send_email(
+        to_address=manager.email,
+        subject=subject,
+        message=f"Bonjour {manager.firstname},\n\n{body}\n",
+    )
 
 
 @api_bp.route("/engagement/<int:engagement_id>", methods=["GET"])
@@ -125,6 +138,8 @@ def get_engagement(engagement_id):
 @api_bp.route("/engagement/user/<int:user_id>", methods=["GET"])
 @login_required
 def get_user_engagements(user_id):
+    if user_id != current_user.user_id:
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
     db = get_db()
     engagements = db.list_engagements(user_id)
     if not engagements:
@@ -132,8 +147,6 @@ def get_user_engagements(user_id):
             "status": "error",
             "message": "No engagements found for this user"
             }), 404
-    if user_id != current_user.user_id:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
 
     return jsonify({
         "status": "success",
@@ -156,9 +169,9 @@ def update_engagement(engagement_id):
 
     engagement = db.get_engagement_by_id(engagement_id)
     if engagement is None:
-        return jsonify({"status": "error", "message": "Engagement not found"}), 404
+        return jsonify({"status": "error", "message": "Inscription introuvable"}), 404
     if engagement.user != current_user:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
     
     current_status = _to_engagement_status(engagement.status)
     if current_status is None:
@@ -168,23 +181,33 @@ def update_engagement(engagement_id):
     try:
         payload = UpdateEngagementPayload(**raw_json)
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Invalid payload: {e}"}), 400
+        current_app.logger.info("Invalid engagement payload: %s", e)
+        return jsonify({"status": "error", "message": "Demande invalide"}), 400
 
     new_status = _to_engagement_status(payload.status)
     if new_status is None:
-        return jsonify({"status": "error", "message": "Invalid status"}), 400
+        return jsonify({"status": "error", "message": "Statut invalide"}), 400
     if new_status == EngagementStatus.VALIDATED:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
     if current_status == EngagementStatus.CANCELLED:
-        return jsonify({"status": "error", "message": "Cannot change status from cancelled"}), 400
+        return jsonify({"status": "error", "message": "Cette demande a été refusée, elle ne peut plus être modifiée"}), 400
     if current_status == EngagementStatus.VALIDATED and new_status != EngagementStatus.CANCELLED:
-        return jsonify({"status": "error", "message": "Cannot change status from validated to non-cancelled"}), 400
+        return jsonify({"status": "error", "message": "Votre inscription est validée : vous pouvez seulement l'annuler"}), 400
+    asks_engagement = new_status == EngagementStatus.PENDING and current_status != EngagementStatus.PENDING
+    if asks_engagement and not engagement.race.is_open_for_engagement(datetime.now()):
+        return jsonify({"status": "error", "message": "Les inscriptions sont closes pour cette course"}), 400
 
     try:
         db.update_engagement(engagement_id=engagement_id, status=new_status)
-        return jsonify({"status": "success", "message": "Engagement updated"}), 200
     except ValueError:
         return jsonify({"status": "error", "message": "Failed to update engagement"}), 400
+
+    if current_app.config['notify']:
+        if asks_engagement:
+            _notify_manager(db, engagement.race)
+        elif current_status == EngagementStatus.VALIDATED and new_status == EngagementStatus.CANCELLED:
+            _notify_manager(db, engagement.race, withdrawal=True)
+    return jsonify({"status": "success", "message": "Engagement updated"}), 200
 
 
 @api_bp.route("/engagement/<int:engagement_id>", methods=["DELETE"])
@@ -193,13 +216,13 @@ def delete_engagement(engagement_id):
     db = get_db()
     engagement = db.get_engagement_by_id(engagement_id)
     if engagement is None:
-        return jsonify({"status": "error", "message": "Engagement not found"}), 404
+        return jsonify({"status": "error", "message": "Inscription introuvable"}), 404
     if engagement.user != current_user:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
+        return jsonify({"status": "error", "message": "Action non autorisée"}), 403
     if _to_engagement_status(engagement.status) == EngagementStatus.VALIDATED:
         return jsonify({
             "status": "error",
-            "message": "Unauthorized to delete a validated engagement"
+            "message": "Votre inscription est validée : utilisez « Annuler ma participation »"
         }), 400
 
     try:

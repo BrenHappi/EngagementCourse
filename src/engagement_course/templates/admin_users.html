@@ -1,337 +1,178 @@
 {% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
 
-{% block title %}Administration | Engagement Course{% endblock %}
+{% block title %}Membres{% endblock %}
+
+{% macro category_select(name, selected_key, id) -%}
+	<select name="{{ name }}" id="{{ id }}">
+		<option value="" {% if not selected_key %}selected{% endif %}>Aucune</option>
+		{% for level, numbers in available_category_filters.items() %}
+			{% for number in numbers %}
+				{% set key = level ~ '_' ~ number %}
+				<option value="{{ key }}" {% if key == selected_key %}selected{% endif %}>{{ level|capitalize }} {{ number }}</option>
+			{% endfor %}
+		{% endfor %}
+	</select>
+{%- endmacro %}
+
+{% macro managed_choices(managed) -%}
+	<div class="chips">
+		{% for level, numbers in available_category_filters.items() %}
+			{% for number in numbers %}
+				{% set is_managed = (managed or [])|selectattr('level', 'equalto', level)|selectattr('number', 'equalto', number)|list %}
+				<label class="chip-choice"><input type="checkbox" name="managed_categories" value="{{ level }}_{{ number }}"{% if is_managed %} checked{% endif %}><span>{{ level|capitalize }} {{ number }}</span></label>
+			{% endfor %}
+		{% endfor %}
+	</div>
+{%- endmacro %}
 
 {% block content %}
-	{% set create_user_url = create_user_url if create_user_url is defined else url_for('admin.manage_users') %}
-	{% set update_user_url = update_user_url if update_user_url is defined else url_for('admin.manage_users') %}
-	{% set delete_user_url = delete_user_url if delete_user_url is defined else url_for('admin.manage_users') %}
-
-	{% if registration_url is defined %}
-		{% set registration_link = registration_url %}
-	{% elif registration_token is defined %}
-		{% set registration_link = url_for('auth.register', _external=True, _t=registration_token) %}
-	{% else %}
-		{% set registration_link = '' %}
-	{% endif %}
-
-	<section class="hero hero-compact">
-		<div class="hero-grid">
-			<div>
-				<p class="eyebrow">Administration</p>
-				<h1>Utilisateurs</h1>
-				<div class="tag-list">
-					<span class="tag tag-accent">Creation</span>
-					<span class="tag">Mise a jour</span>
-					<span class="tag">Suppression</span>
-				</div>
-			</div>
-			<div class="hero-brand">
-				<img class="hero-brand-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-				<img class="hero-brand-hermine" src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
-				<div class="hero-brand-content">
-					<p class="eyebrow">Zone admin</p>
-					<p class="hero-brand-title">{{ users|length }} comptes</p>
-					<div class="tag-list">
-						<span class="tag tag-accent">Utilisateurs</span>
-						<span class="tag">Inscriptions</span>
-					</div>
-				</div>
-			</div>
-		</div>
-	</section>
-
+	<div class="page-head"><h1>Membres</h1></div>
 	{% set active_admin_section = 'users' %}
 	{% include "partials/admin_nav.html" %}
 
-	<section class="panel panel-stack">
-		<div>
-			<p class="eyebrow">Inscription</p>
-			<h2>Lien d'inscription</h2>
+	{# ── Registration link ────────────────────────────── #}
+	<section class="card">
+		<h2 class="card-title">Lien d'inscription</h2>
+		<p class="card-lead">Envoyez ce lien aux nouveaux membres pour qu'ils créent eux-mêmes leur compte.</p>
+		<div class="registration-link">
+			<input id="registration-link" type="text" value="{{ registration_url }}" readonly aria-label="Lien d'inscription">
+			<button class="btn" type="button" id="copy-registration-link">{{ icon('copy') }}Copier le lien</button>
 		</div>
-		<div class="registration-link-row">
-			<input id="registration-link" type="text" value="{{ registration_link }}" readonly>
-			<button class="button-secondary icon-btn icon-toolbar" type="button" id="copy-registration-link" aria-label="Copier le lien" title="Copier le lien">
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					<rect x="9" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-					<rect x="3" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-				</svg>
-			</button>
-		</div>
-		<p id="copy-feedback" class="copy-feedback" aria-live="polite"></p>
-		<form method="post" action="{{ update_user_url }}" onsubmit="return confirm('L\'ancien lien ne fonctionnera plus. Continuer ?');">
+		<form method="post" action="{{ url_for('admin.manage_users') }}" onsubmit="return confirm('L\'ancien lien ne fonctionnera plus. Créer un nouveau lien ?');" style="margin-top:.75rem">
 			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 			<input type="hidden" name="_action" value="regenerate_registration_token">
-			<button class="button-secondary" type="submit">Régénérer le lien</button>
+			<button class="link-btn" type="submit">Créer un nouveau lien (l'ancien ne marchera plus)</button>
 		</form>
-		{% if not registration_link %}
-			<div class="empty-state">Le lien s'affichera ici quand la route admin fournira registration_url ou registration_token.</div>
-		{% endif %}
 	</section>
 
-	<section class="table-shell" aria-label="table utilisateurs">
-			<div class="panel-title-row" style="padding: 1.4rem 1.4rem 0;">
-				<div>
-					<p class="eyebrow">Comptes</p>
-					<h2>Utilisateurs existants</h2>
+	{# ── New member ───────────────────────────────────── #}
+	<details class="card disclosure" style="margin-top:1rem">
+		<summary><span style="display:inline-flex;align-items:center;gap:.5rem">{{ icon('plus') }}Créer un compte pour un membre</span></summary>
+		<form method="post" action="{{ url_for('admin.manage_users') }}" style="margin-top:1rem">
+			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+			<input type="hidden" name="_action" value="create_user">
+			<div class="field-grid">
+				<div class="field"><label for="new-firstname">Prénom</label><input id="new-firstname" name="firstname" type="text" required></div>
+				<div class="field"><label for="new-lastname">Nom</label><input id="new-lastname" name="lastname" type="text" required></div>
+				<div class="field span-2"><label for="new-email">Email</label><input id="new-email" name="email" type="email" required autocapitalize="none"></div>
+				<div class="field"><label for="new-category">Catégorie</label>{{ category_select('category', '', 'new-category') }}</div>
+				<div class="field">
+					<label for="new-role">Rôle</label>
+					<select id="new-role" name="role" data-role-select>
+						<option value="user" selected>Membre</option>
+						<option value="admin">Administrateur</option>
+					</select>
 				</div>
-				<span class="chip">{{ users|length }} utilisateur{% if users|length > 1 %}s{% endif %}</span>
+				<div class="field span-2" data-managed-block hidden>
+					<span class="label">Catégories gérées</span>
+					{{ managed_choices([]) }}
+				</div>
+				<div class="field span-2">
+					<label for="new-password">Mot de passe provisoire</label>
+					<input id="new-password" name="password" type="text" required autocomplete="off">
+					<p class="field-help">À transmettre au membre, qui pourra le changer dans son profil.</p>
+				</div>
 			</div>
+			<button type="submit" class="btn btn-block" style="margin-top:1rem">Créer le compte</button>
+		</form>
+	</details>
 
-			{% if users %}
-				<div class="table-scroll">
-					<table class="admin-users-table">
-						<thead>
-							<tr>
-								<th>ID</th>
-								<th>Prénom</th>
-								<th>Nom</th>
-								<th>Username</th>
-								<th>Email</th>
-								<th>Catégorie</th>
-								<th>Role</th>
-								<th>Catégories gérées</th>
-								<th>Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{% for user in users %}
-								{% set form_id = 'update-user-' ~ user.user_id %}
-								{% set category_key = (user.category.level ~ '_' ~ user.category.number) if user.category else '' %}
-								<tr class="user-row" data-form-id="{{ form_id }}">
-									<td data-label="ID">{{ user.user_id }}</td>
-									<td data-label="Prénom">
-										<span class="cell-text js-display">{{ user.firstname }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="firstname" type="text" value="{{ user.firstname }}" disabled hidden>
-									</td>
-									<td data-label="Nom">
-										<span class="cell-text js-display">{{ user.lastname }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="lastname" type="text" value="{{ user.lastname }}" disabled hidden>
-									</td>
-									<td data-label="Username">
-										<span class="cell-text js-display">{{ user.username }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="username" type="text" value="{{ user.username }}" disabled hidden>
-									</td>
-									<td data-label="Email">
-										<span class="cell-text js-display">{{ user.email }}</span>
-										<input class="js-editor js-editable" form="{{ form_id }}" name="email" type="email" value="{{ user.email }}" disabled hidden>
-									</td>
-									<td data-label="Catégorie">
-										<span class="cell-text js-display">{{ category_key if category_key else 'Aucune' }}</span>
-										<select class="js-editor js-editable" form="{{ form_id }}" name="category" disabled hidden>
-											<option value="" {% if not category_key %}selected{% endif %}>Aucune</option>
-											{% for level, numbers in available_category_filters.items() %}
-												{% for number in numbers %}
-													{% set option_key = level ~ '_' ~ number %}
-													<option value="{{ option_key }}" {% if option_key == category_key %}selected{% endif %}>{{ level }} {{ number }}</option>
-												{% endfor %}
-											{% endfor %}
-										</select>
-									</td>
-									<td data-label="Role">
-										<span class="cell-text js-display">{{ user.role }}</span>
-										<select class="js-editor js-editable" form="{{ form_id }}" name="role" disabled hidden>
-											<option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
-											<option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
-										</select>
-									</td>
-									<td data-label="Catégories gérées">
-										<span class="cell-text js-display">
-											{% if user.role == 'admin' and user.managed_categories %}
-												{% for managed in user.managed_categories %}<span class="cat-tag" title="{{ managed.level }} {{ managed.number }}">{{ managed.level[0] }}{{ managed.number }}</span>{% endfor %}
-											{% else %}
-												—
-											{% endif %}
-										</span>
-										<fieldset class="managed-editor js-editor" disabled hidden>
-											<input form="{{ form_id }}" type="hidden" name="managed_categories_submitted" value="1">
-											{% for level, numbers in available_category_filters.items() %}
-												{% for number in numbers %}
-													{% set is_managed = (user.managed_categories or [])|selectattr('level', 'equalto', level)|selectattr('number', 'equalto', number)|list %}
-													<label class="checkbox-pill checkbox-pill-compact" title="{{ level }} {{ number }}">
-														<input form="{{ form_id }}" type="checkbox" name="managed_categories" value="{{ level }}_{{ number }}" {% if is_managed %}checked{% endif %}>
-														<span>{{ level[0] }}{{ number }}</span>
-													</label>
-												{% endfor %}
-											{% endfor %}
-										</fieldset>
-									</td>
-									<td data-label="Actions">
-										<div class="actions compact-actions">
-											<form id="{{ form_id }}" method="post" action="{{ update_user_url }}">
-												<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-												<input type="hidden" name="_action" value="update_user">
-												<input type="hidden" name="user_id" value="{{ user.user_id }}">
-											</form>
-											<button class="icon-btn icon-edit js-edit-row js-view-action" type="button" aria-label="Modifier" title="Modifier">
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-													<path d="M14.06 6.19 17.81 9.94" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-												</svg>
-											</button>
-											<button class="icon-btn icon-confirm js-save-row js-edit-action" type="submit" form="{{ form_id }}" aria-label="Valider" title="Valider" hidden>
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
-												</svg>
-											</button>
-											<button class="icon-btn js-cancel-row js-edit-action" type="button" aria-label="Annuler" title="Annuler" hidden>
-												<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-													<path d="M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
-													<path d="m6 6 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path>
-												</svg>
-											</button>
+	{# ── Members ──────────────────────────────────────── #}
+	<div class="section-title">
+		<h2>{{ users|length }} membre{{ 's' if users|length > 1 }}</h2>
+	</div>
+	<div class="member-search">
+		<input type="search" id="member-search" placeholder="Rechercher un nom, un email…" aria-label="Rechercher un membre" autocomplete="off">
+	</div>
 
-											<form class="js-view-action" method="post" action="{{ delete_user_url }}" onsubmit="return confirm('Supprimer cet utilisateur ?');">
-												<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-												<input type="hidden" name="_action" value="delete_user">
-												<input type="hidden" name="user_id" value="{{ user.user_id }}">
-												<button class="icon-btn icon-danger" type="submit" aria-label="Supprimer" title="Supprimer">
-													<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-														<path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-														<path d="M8 6V4h8v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-														<path d="M19 6v14H5V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-														<path d="M10 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-														<path d="M14 11v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-													</svg>
-												</button>
-											</form>
-										</div>
-									</td>
-								</tr>
-							{% endfor %}
-						</tbody>
-						<tfoot>
-							<tr class="create-row">
-								<td data-label="Nouveau">+</td>
-								<td data-label="Prénom"><input form="create-user-inline" name="firstname" type="text" required placeholder="Prénom"></td>
-								<td data-label="Nom"><input form="create-user-inline" name="lastname" type="text" required placeholder="Nom"></td>
-								<td data-label="Username"><input form="create-user-inline" name="username" type="text" placeholder="auto"></td>
-								<td data-label="Email"><input form="create-user-inline" name="email" type="email" required placeholder="email"></td>
-								<td data-label="Catégorie">
-									<select form="create-user-inline" name="category">
-										<option value="" selected>Aucune</option>
-										{% for level, numbers in available_category_filters.items() %}
-											{% for number in numbers %}
-												<option value="{{ level }}_{{ number }}">{{ level }} {{ number }}</option>
-											{% endfor %}
-										{% endfor %}
-									</select>
-								</td>
-								<td data-label="Role">
-									<select form="create-user-inline" name="role">
-										<option value="user" selected>user</option>
-										<option value="admin">admin</option>
-									</select>
-								</td>
-								<td data-label="Catégories gérées">
-									<div class="managed-editor">
-										{% for level, numbers in available_category_filters.items() %}
-											{% for number in numbers %}
-												<label class="checkbox-pill checkbox-pill-compact" title="{{ level }} {{ number }} (admins uniquement)">
-													<input form="create-user-inline" type="checkbox" name="managed_categories" value="{{ level }}_{{ number }}">
-													<span>{{ level[0] }}{{ number }}</span>
-												</label>
-											{% endfor %}
-										{% endfor %}
-									</div>
-								</td>
-								<td data-label="Mot de passe">
-									<div class="compact-actions">
-										<input form="create-user-inline" name="password" type="password" required placeholder="mot de passe">
-										<button class="icon-btn icon-confirm" type="submit" form="create-user-inline" aria-label="Ajouter" title="Ajouter">＋</button>
-									</div>
-								</td>
-							</tr>
-						</tfoot>
-					</table>
-					<form id="create-user-inline" method="post" action="{{ create_user_url }}">
+	<div class="member-list">
+		{% for user in users|sort(attribute='lastname') %}
+			{% set category_key = user.category.to_key() if user.category else '' %}
+			<details class="card member disclosure" data-search="{{ (user.firstname ~ ' ' ~ user.lastname ~ ' ' ~ user.email ~ ' ' ~ user.username)|lower }}">
+				<summary>
+					<span class="member-main">
+						<strong class="member-name">{{ user.firstname }} {{ user.lastname }}</strong>
+						{% if user.category %}<span class="tag">{{ user.category.label }}</span>{% endif %}
+						{% if user.role == 'admin' %}<span class="badge badge-admin">Admin{% if user.managed_categories %} · {{ 'toutes catégories' if user.managed_categories|length >= 7 else user.managed_categories|map(attribute='label')|join(', ') }}{% endif %}</span>{% endif %}
+						<span class="member-email">{{ user.email }}</span>
+					</span>
+				</summary>
+				<div class="member-body">
+					<form method="post" action="{{ url_for('admin.manage_users') }}">
 						<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-						<input type="hidden" name="_action" value="create_user">
+						<input type="hidden" name="_action" value="update_user">
+						<input type="hidden" name="user_id" value="{{ user.user_id }}">
+						<div class="field-grid">
+							<div class="field"><label for="u{{ user.user_id }}-firstname">Prénom</label><input id="u{{ user.user_id }}-firstname" name="firstname" type="text" value="{{ user.firstname }}"></div>
+							<div class="field"><label for="u{{ user.user_id }}-lastname">Nom</label><input id="u{{ user.user_id }}-lastname" name="lastname" type="text" value="{{ user.lastname }}"></div>
+							<div class="field span-2"><label for="u{{ user.user_id }}-email">Email</label><input id="u{{ user.user_id }}-email" name="email" type="email" value="{{ user.email }}"></div>
+							<div class="field"><label for="u{{ user.user_id }}-username">Nom d'utilisateur</label><input id="u{{ user.user_id }}-username" name="username" type="text" value="{{ user.username }}"></div>
+							<div class="field"><label for="u{{ user.user_id }}-category">Catégorie</label>{{ category_select('category', category_key, 'u' ~ user.user_id ~ '-category') }}</div>
+							<div class="field span-2">
+								<label for="u{{ user.user_id }}-role">Rôle</label>
+								<select id="u{{ user.user_id }}-role" name="role" data-role-select>
+									<option value="user" {% if user.role == 'user' %}selected{% endif %}>Membre</option>
+									<option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrateur</option>
+								</select>
+							</div>
+							<div class="field span-2" data-managed-block {% if user.role != 'admin' %}hidden{% endif %}>
+								<input type="hidden" name="managed_categories_submitted" value="1">
+								<span class="label">Catégories gérées</span>
+								{{ managed_choices(user.managed_categories) }}
+							</div>
+						</div>
+						<button type="submit" class="btn btn-block" style="margin-top:1rem">Enregistrer</button>
 					</form>
-				</div>
-			{% else %}
-				<div class="empty-state" style="margin: 1.4rem;">Aucun utilisateur pour le moment.</div>
-			{% endif %}
-	</section>
 
+					{% if user.user_id != current_user.user_id %}
+						<form class="danger-zone" method="post" action="{{ url_for('admin.manage_users') }}" data-question="Supprimer définitivement le compte de {{ user.firstname }} {{ user.lastname }} et ses inscriptions ?" onsubmit="return confirm(this.dataset.question);">
+							<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+							<input type="hidden" name="_action" value="delete_user">
+							<input type="hidden" name="user_id" value="{{ user.user_id }}">
+							<button class="btn btn-danger btn-sm" type="submit">Supprimer ce compte</button>
+						</form>
+					{% endif %}
+				</div>
+			</details>
+		{% endfor %}
+	</div>
+	<p class="empty" id="no-member" hidden>Aucun membre ne correspond à cette recherche.</p>
 {% endblock %}
 
 {% block scripts %}
 	<script>
 		(function () {
 			var copyButton = document.getElementById("copy-registration-link");
-			var registrationInput = document.getElementById("registration-link");
-			var feedback = document.getElementById("copy-feedback");
-
-			if (!copyButton || !registrationInput || !feedback) {
-				return;
-			}
-
+			var linkInput = document.getElementById("registration-link");
 			copyButton.addEventListener("click", async function () {
-				var link = registrationInput.value;
-				if (!link) {
-					feedback.textContent = "Aucun lien disponible.";
-					return;
-				}
-
 				try {
-					if (navigator.clipboard && navigator.clipboard.writeText) {
-						await navigator.clipboard.writeText(link);
-					} else {
-						registrationInput.focus();
-						registrationInput.select();
-						document.execCommand("copy");
-					}
-					feedback.textContent = "Lien copie dans le presse-papier.";
+					await navigator.clipboard.writeText(linkInput.value);
 				} catch (error) {
-					feedback.textContent = "Copie impossible. Copiez le lien manuellement.";
+					linkInput.select();
+					document.execCommand("copy");
 				}
+				window.showToast("Lien copié : collez-le dans un email ou un SMS.");
 			});
 
-			function setRowEditingMode(row, isEditing) {
-				if (!row) {
-					return;
-				}
-
-				row.classList.toggle("is-editing", isEditing);
-				row.querySelectorAll(".js-display").forEach(function (el) { el.hidden = isEditing; });
-				row.querySelectorAll(".js-editor").forEach(function (el) {
-					el.hidden = !isEditing;
-					el.disabled = !isEditing;
-				});
-				row.querySelectorAll(".js-view-action").forEach(function (el) { el.hidden = isEditing; });
-				row.querySelectorAll(".js-edit-action").forEach(function (el) { el.hidden = !isEditing; });
-			}
-
-			document.querySelectorAll("tr.user-row").forEach(function (row) {
-				setRowEditingMode(row, false);
+			// Managed categories only make sense for administrators
+			document.querySelectorAll("[data-role-select]").forEach(function (select) {
+				var block = select.form.querySelector("[data-managed-block]");
+				select.addEventListener("change", function () { block.hidden = select.value !== "admin"; });
 			});
 
-			document.querySelectorAll(".js-edit-row").forEach(function (editButton) {
-				editButton.addEventListener("click", function () {
-					var row = editButton.closest("tr.user-row");
-					if (!row) {
-						return;
-					}
-
-					setRowEditingMode(row, true);
+			var search = document.getElementById("member-search");
+			var members = document.querySelectorAll(".member");
+			var noMember = document.getElementById("no-member");
+			search.addEventListener("input", function () {
+				var query = search.value.trim().toLowerCase();
+				var shown = 0;
+				members.forEach(function (member) {
+					var match = member.getAttribute("data-search").indexOf(query) !== -1;
+					member.hidden = !match;
+					if (match) shown++;
 				});
-			});
-
-			document.querySelectorAll(".js-cancel-row").forEach(function (cancelButton) {
-				cancelButton.addEventListener("click", function () {
-					var row = cancelButton.closest("tr.user-row");
-					if (!row) {
-						return;
-					}
-					var formId = row.getAttribute("data-form-id");
-					var form = formId ? document.getElementById(formId) : null;
-					if (form) {
-						form.reset();
-					}
-
-					setRowEditingMode(row, false);
-				});
+				noMember.hidden = shown > 0;
 			});
 		})();
 	</script>

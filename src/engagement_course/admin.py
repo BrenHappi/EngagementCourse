@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from wtforms import HiddenField, PasswordField, SelectField, SelectMultipleField, StringField
 from wtforms.validators import DataRequired, Optional
 from engagement_course.mail import send_email
-from engagement_course.utils import get_db
+from engagement_course.utils import generate_username, get_db
 from engagement_course.models import CATEGORIES, Category, EngagementStatus
 
 admin_bp = Blueprint("admin", __name__)
@@ -40,8 +40,8 @@ class AdminUpdateEngagementForm(FlaskForm):
     engagement_id = HiddenField(validators=[DataRequired()])
     status = SelectField(
         choices=[
-            (EngagementStatus.VALIDATED.value, "Validee"),
-            (EngagementStatus.CANCELLED.value, "Rejetee"),
+            (EngagementStatus.VALIDATED.value, "Validée"),
+            (EngagementStatus.CANCELLED.value, "Refusée"),
         ],
         validators=[DataRequired()],
     )
@@ -92,21 +92,21 @@ def manage_users():
                     password = form.password.data
                     firstname = (form.firstname.data or "").strip()
                     lastname = (form.lastname.data or "").strip()
-                    username = (form.username.data or (firstname[0]+lastname)).strip().lower()
+                    username = (form.username.data or "").strip().lower() or generate_username(db, firstname, lastname)
                     role = (form.role.data or "user").strip()
                     address = (form.address.data or "").strip()
                     category_key = (form.category.data or "").strip()
                     category = Category.from_key(category_key)
 
                     if not all([firstname, lastname, email, password, role]):
-                        flash("Tous les champs sont requis pour créer un utilisateur")
+                        flash("Tous les champs sont requis pour créer un utilisateur", "error")
                         return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_email(email):
-                        flash("Un utilisateur avec cet email existe déjà")
+                        flash("Un utilisateur avec cet email existe déjà", "error")
                         return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_username(username):
-                        flash("Un utilisateur avec ce nom d'utilisateur existe déjà")
-                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)                        
+                        flash("Un utilisateur avec ce nom d'utilisateur existe déjà", "error")
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
 
                     if role.lower() not in ["user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
@@ -123,8 +123,9 @@ def manage_users():
                         managed_categories=managed_categories if role.lower() == "admin" else None,
                         address=address,
                     )
-                    flash("Utilisateur créé avec succès")
+                    flash(f"Le compte de {firstname} {lastname} a été créé")
                     return redirect(url_for("admin.manage_users"))
+                flash("Prénom, nom, email et mot de passe sont obligatoires", "error")
 
             case "update_user":
                 form = AdminUpdateUserForm()
@@ -146,13 +147,16 @@ def manage_users():
                     if not user:
                         abort(404, description="Utilisateur non trouvé")
                     if db.get_user_by_email(email) and db.get_user_by_email(email).id != user_id:
-                        flash("Un utilisateur avec cet email existe déjà")
+                        flash("Un utilisateur avec cet email existe déjà", "error")
                         return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_username(username) and db.get_user_by_username(username).id != user_id:
-                        flash("Un utilisateur avec ce nom d'utilisateur existe déjà")
+                        flash("Un utilisateur avec ce nom d'utilisateur existe déjà", "error")
                         return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
-                    if role not in ["user", "admin"]:
+                    if role not in [None, "user", "admin"]:
                         abort(400, description="Rôle invalide sélectionné")
+                    if user_id == current_user.user_id and role == "user":
+                        flash("Vous ne pouvez pas retirer vos propres droits d'administrateur", "error")
+                        return redirect(url_for("admin.manage_users"))
 
                     managed_categories = None
                     if form.managed_categories_submitted.data and (role or user.role) == "admin":
@@ -169,7 +173,7 @@ def manage_users():
                         role=role.lower() if role else None,
                         managed_categories=managed_categories
                     )
-                    flash(f"Utilisateur {user_id} ({username}) mis à jour avec succès")
+                    flash(f"Le compte de {firstname or user.firstname} {lastname or user.lastname} a été mis à jour")
                     return redirect(url_for("admin.manage_users"))
 
             case "delete_user":
@@ -179,8 +183,11 @@ def manage_users():
                     user = db.get_user_by_id(user_id)
                     if not user:
                         abort(404, description="Utilisateur non trouvé")
+                    if user_id == current_user.user_id:
+                        flash("Vous ne pouvez pas supprimer votre propre compte depuis cette page", "error")
+                        return redirect(url_for("admin.manage_users"))
                     db.delete_user(user_id)
-                    flash(f"Utilisateur {user_id} ({user.username}) supprimé avec succès")
+                    flash(f"Le compte de {user.firstname} {user.lastname} a été supprimé")
                     return redirect(url_for("admin.manage_users"))
 
             case "regenerate_registration_token":
@@ -228,15 +235,19 @@ def manage_engagements():
                 abort(400, description="Statut d'engagement invalide")
 
             db.update_engagement(engagement_id, status.value)
-            flash(f"Engagement {engagement_id} mis à jour avec succès")
+            rider = f"{engagement.user.firstname} {engagement.user.lastname}"
+            race = engagement.race
+            decision = "validée" if status == EngagementStatus.VALIDATED else "refusée"
+            flash(f"Inscription de {rider} à {race.display_location} {decision}")
             if current_app.config['notify'] and engagement.user.email:
                 sent = send_email(
                     to_address=engagement.user.email,
-                    subject=f"Votre demande d'inscription à {engagement.race.location} a été {status.value}",
-                    message=f"Bonjour {engagement.user.firstname},\n\nVotre demande d'inscription à {engagement.race.location} ({engagement.race.department}) le {engagement.race.date} a été {status.value} par l'administrateur.\n\nCordialement,\nASPTT Rennes"
+                    subject=f"Votre inscription à {race.display_location} a été {decision}",
+                    message=f"Bonjour {engagement.user.firstname},\n\nVotre demande d'inscription à la course de {race.display_location} ({race.department_name}) "
+                            f"le {race.long_date().lower()} {race.date.year} a été {decision}.\n\nCordialement,\nASPTT Rennes"
                 )
                 if not sent:
-                    flash(f"L'email de notification n'a pas pu être envoyé à {engagement.user.email}")
+                    flash(f"L'email de notification n'a pas pu être envoyé à {engagement.user.email}", "error")
             return redirect(url_for("admin.manage_engagements"))
 
     selected_status = request.args.get("status", default=EngagementStatus.PENDING.value)

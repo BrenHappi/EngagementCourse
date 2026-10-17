@@ -1,220 +1,120 @@
 {% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
 
-{% block title %}Profil | Engagement Course{% endblock %}
+{% block title %}Mon profil{% endblock %}
+{% block page_class %}page-narrow{% endblock %}
 
 {% block content %}
-	{% set category_label = user.category|string if user.category else 'Non renseignée' %}
-	{% set managed_count = user.managed_categories|length if user.managed_categories else 0 %}
-	{% set address_label = user.address if user.address else 'Non renseignée' %}
-	<section class="hero profile-hero">
-		<div class="hero-grid profile-hero-grid">
-			<div>
-				<p class="eyebrow">Mon compte</p>
-				<h1>{{ user.firstname }} {{ user.lastname }}</h1>
-				<p class="hero-copy">Mettez à jour vos informations personnelles, votre catégorie et votre mot de passe depuis un seul espace.</p>
-				<div class="stats-grid profile-stats-grid">
-					<div class="stat-card">
-						<div class="stat-label">Identifiant</div>
-						<div class="stat-value stat-value-compact">@{{ user.username }}</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-label">Rôle</div>
-						<div class="stat-value stat-value-compact">{{ user.role }}</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-label">Catégorie</div>
-						<div class="stat-value stat-value-compact">{{ category_label }}</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-label">Adresse</div>
-						<div class="stat-value stat-value-compact">{{ address_label }}</div>
-					</div>
-				</div>
-			</div>
-			<div class="profile-summary-card">
-				<div class="profile-avatar" aria-hidden="true">{{ user.firstname[:1]|upper if user.firstname else user.username[:1]|upper }}</div>
-				<div class="profile-summary-copy">
-					<p class="eyebrow">Vue rapide</p>
-					<p class="profile-summary-name">{{ user.firstname }} {{ user.lastname }}</p>
-					<div class="chip-row">
-						<span class="chip">{{ category_label }}</span>
-						{% if user.role == 'admin' %}
-							<span class="chip">{{ managed_count }} catégories gérées</span>
-						{% endif %}
-					</div>
-				</div>
-			</div>
+	<div class="profile-head">
+		<div class="avatar" aria-hidden="true">{{ (user.firstname or user.username)[:1]|upper }}</div>
+		<div>
+			<h1>{{ user.firstname }} {{ user.lastname }}</h1>
+			<p>{{ user.category.label if user.category else 'Catégorie non renseignée' }}{% if user.role == 'admin' %} · Administrateur{% endif %}</p>
 		</div>
-	</section>
-
-	<div class="profile-layout">
-		<aside class="panel panel-stack profile-aside">
-			<div class="panel-title-row profile-panel-title-row">
-				<div>
-					<p class="eyebrow">Résumé</p>
-					<h2>Compte</h2>
-				</div>
-			</div>
-			<dl class="profile-meta-list">
-				<div>
-					<dt>Email</dt>
-					<dd>{{ user.email }}</dd>
-				</div>
-				<div>
-					<dt>Nom d'utilisateur</dt>
-					<dd>@{{ user.username }}</dd>
-				</div>
-				<div>
-					<dt>Catégorie</dt>
-					<dd>{{ category_label }}</dd>
-				</div>
-				<div>
-					<dt>Adresse</dt>
-					<dd>{{ address_label }}</dd>
-				</div>
-				<div>
-					<dt>Accès</dt>
-					<dd>{{ 'Administration' if user.role == 'admin' else 'Utilisateur' }}</dd>
-				</div>
-			</dl>
-
-			{% if user.role == 'admin' and user.managed_categories %}
-				<div class="profile-managed-block">
-					<p class="eyebrow">Administration</p>
-					<div class="tag-list">
-						{% for managed_category in user.managed_categories %}
-							<span class="tag tag-accent">{{ managed_category }}</span>
-						{% endfor %}
-					</div>
-				</div>
-			{% endif %}
-		</aside>
-
-		<section class="panel panel-stack">
-			<div class="panel-title-row profile-panel-title-row">
-				<div>
-					<p class="eyebrow">Modification</p>
-					<h2>Mettre à jour le profil</h2>
-				</div>
-			</div>
-
-			<form method="post" action="{{ url_for('profile.profile') }}" class="profile-form">
-				{{ profile_form.hidden_tag() }}
-
-				<div class="field-grid">
-					<div class="field">
-						<label for="profile-firstname">Prénom</label>
-						{{ profile_form.firstname(id="profile-firstname", type="text", placeholder="Prénom") }}
-					</div>
-
-					<div class="field">
-						<label for="profile-lastname">Nom</label>
-						{{ profile_form.lastname(id="profile-lastname", type="text", placeholder="Nom") }}
-					</div>
-
-					<div class="field">
-						<label for="profile-username">Nom d'utilisateur</label>
-						{{ profile_form.username(id="profile-username", type="text", placeholder="Nom d'utilisateur") }}
-					</div>
-
-					<div class="field">
-						<label for="profile-category">Catégorie</label>
-						{{ profile_form.category(id="profile-category") }}
-					</div>
-
-					<div class="field field-span-2">
-						<label for="profile-address">Adresse</label>
-						{{ profile_form.address(id="profile-address", type="text", placeholder="Adresse complète") }}
-					</div>
-
-					{% if user.role == 'admin' %}
-						<div class="field field-span-2">
-							<span class="profile-field-label">Catégories gérées</span>
-							<div class="profile-choice-grid" id="profile-managed_categories">
-								{% for value, label in profile_form.managed_categories.choices %}
-									<label class="checkbox-pill profile-choice-chip">
-										<input
-											type="checkbox"
-											name="{{ profile_form.managed_categories.name }}"
-											value="{{ value }}"
-											{% if value in profile_form.managed_categories.data %}checked{% endif %}
-										>
-										<span>{{ label }}</span>
-									</label>
-								{% endfor %}
-							</div>
-							<div class="profile-choice-actions">
-								<button type="button" class="button-secondary" id="clear-managed-categories">Tout effacer</button>
-							</div>
-							<p class="profile-field-help">Cliquez sur les catégories à gérer. Tout effacer retire toute sélection.</p>
-						</div>
-
-						<div class="field field-span-2">
-							<span class="profile-field-label">Récap hebdomadaire par email</span>
-							<label class="checkbox-pill profile-recap-toggle" for="profile-recap_enabled">
-								{{ profile_form.recap_enabled(id="profile-recap_enabled") }}
-								<span>{{ profile_form.recap_enabled.label.text }}</span>
-							</label>
-							<div class="profile-recap-schedule">
-								<div class="field">
-									<label for="profile-recap_weekday">Jour</label>
-									{{ profile_form.recap_weekday(id="profile-recap_weekday") }}
-								</div>
-								<div class="field">
-									<label for="profile-recap_hour">Heure</label>
-									{{ profile_form.recap_hour(id="profile-recap_hour") }}
-								</div>
-							</div>
-							<p class="profile-field-help">Envoyé seulement s'il reste des demandes en attente dans vos catégories pour le week-end qui suit.</p>
-						</div>
-					{% endif %}
-				</div>
-
-				<div class="profile-password-block">
-					<div class="profile-section-copy">
-						<p class="eyebrow">Sécurité</p>
-						<h3>Changer le mot de passe</h3>
-						<p>Laissez ces champs vides pour conserver votre mot de passe actuel.</p>
-					</div>
-					<div class="field-grid">
-						<div class="field field-span-2">
-							<label for="profile-current_password">Mot de passe actuel</label>
-							{{ profile_form.current_password(id="profile-current_password", type="password", placeholder="Mot de passe actuel") }}
-						</div>
-						<div class="field">
-							<label for="profile-new_password">Nouveau mot de passe</label>
-							{{ profile_form.new_password(id="profile-new_password", type="password", placeholder="Nouveau mot de passe") }}
-						</div>
-						<div class="field">
-							<label for="profile-confirm_password">Confirmation</label>
-							{{ profile_form.confirm_password(id="profile-confirm_password", type="password", placeholder="Confirmer le mot de passe") }}
-						</div>
-					</div>
-				</div>
-
-				<div class="form-actions">
-					{{ profile_form.submit() }}
-				</div>
-			</form>
-		</section>
 	</div>
-{% endblock %}
 
-{% block scripts %}
-	{{ super() }}
-	<script>
-		(function () {
-			var clearButton = document.getElementById("clear-managed-categories");
-			var managedCategories = document.getElementById("profile-managed_categories");
-			if (!clearButton || !managedCategories) {
-				return;
-			}
+	<form method="post" action="{{ url_for('profile.profile') }}">
+		{{ profile_form.hidden_tag() }}
 
-			clearButton.addEventListener("click", function () {
-				Array.from(managedCategories.querySelectorAll('input[type="checkbox"]')).forEach(function (checkbox) {
-					checkbox.checked = false;
-				});
-			});
-		})();
-	</script>
+		<section class="card form-section">
+			<h2>Mes informations</h2>
+			<div class="field-grid">
+				<div class="field">
+					<label for="profile-firstname">Prénom</label>
+					{{ profile_form.firstname(id="profile-firstname", type="text", autocomplete="given-name") }}
+				</div>
+				<div class="field">
+					<label for="profile-lastname">Nom</label>
+					{{ profile_form.lastname(id="profile-lastname", type="text", autocomplete="family-name") }}
+				</div>
+				<div class="field span-2">
+					<label for="profile-email">Email</label>
+					{{ profile_form.email(id="profile-email", type="email", autocomplete="email", autocapitalize="none") }}
+				</div>
+				<div class="field span-2">
+					<label for="profile-category">Ma catégorie</label>
+					{{ profile_form.category(id="profile-category") }}
+				</div>
+				<div class="field span-2">
+					<label for="profile-address">Mon adresse</label>
+					{{ profile_form.address(id="profile-address", type="text", autocomplete="street-address") }}
+					<p class="field-help">Sert uniquement à afficher la distance jusqu'aux courses.</p>
+				</div>
+				<div class="field span-2">
+					<label for="profile-username">Nom d'utilisateur <span class="label-hint">(pour se connecter sans email)</span></label>
+					{{ profile_form.username(id="profile-username", type="text", autocapitalize="none") }}
+				</div>
+			</div>
+		</section>
+
+		{% if user.role == 'admin' %}
+			<section class="card form-section">
+				<h2>Responsable de catégories</h2>
+				<p class="card-lead">Vous recevez les demandes d'inscription des coureurs de ces catégories.</p>
+				<div class="chips" id="profile-managed_categories">
+					{% for value, label in profile_form.managed_categories.choices %}
+						<label class="chip-choice"><input type="checkbox" name="{{ profile_form.managed_categories.name }}" value="{{ value }}" {% if value in profile_form.managed_categories.data %}checked{% endif %}><span>{{ label }}</span></label>
+					{% endfor %}
+				</div>
+
+				<h3 style="margin-top:1.5rem">Récap hebdomadaire par email</h3>
+				<label class="check" for="profile-recap_enabled">
+					{{ profile_form.recap_enabled(id="profile-recap_enabled") }}
+					Recevoir la liste des demandes à valider pour le week-end
+				</label>
+				<div class="schedule">
+					<div class="field">
+						<label for="profile-recap_weekday">Jour</label>
+						{{ profile_form.recap_weekday(id="profile-recap_weekday") }}
+					</div>
+					<div class="field">
+						<label for="profile-recap_hour">Heure</label>
+						{{ profile_form.recap_hour(id="profile-recap_hour") }}
+					</div>
+				</div>
+				<p class="field-help">Envoyé seulement s'il reste des demandes en attente.</p>
+			</section>
+		{% endif %}
+
+		<details class="card form-section disclosure">
+			<summary><h2 style="margin:0">Changer mon mot de passe</h2></summary>
+			<div style="margin-top:1rem">
+				<div class="field">
+					<label for="profile-current_password">Mot de passe actuel</label>
+					{% with field=profile_form.current_password, field_id="profile-current_password", required=false, autocomplete="current-password" %}{% include "partials/password_field.html" %}{% endwith %}
+				</div>
+				<div class="field">
+					<label for="profile-new_password">Nouveau mot de passe</label>
+					{% with field=profile_form.new_password, field_id="profile-new_password", required=false, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+				</div>
+				<div class="field">
+					<label for="profile-confirm_password">Nouveau mot de passe, encore une fois</label>
+					{% with field=profile_form.confirm_password, field_id="profile-confirm_password", required=false, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+				</div>
+			</div>
+		</details>
+
+		<div class="save-bar">
+			<button type="submit" class="btn">Enregistrer</button>
+		</div>
+	</form>
+
+	<div class="section-title"><h2>Session</h2></div>
+	<form method="post" action="{{ url_for('auth.logout') }}">
+		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+		<button type="submit" class="btn btn-secondary btn-block">{{ icon('logout') }}Se déconnecter</button>
+	</form>
+
+	<details class="card danger-card disclosure" style="margin-top:1.5rem">
+		<summary>Supprimer mon compte</summary>
+		<form method="post" action="{{ url_for('profile.delete_account') }}" onsubmit="return confirm('Supprimer définitivement votre compte et toutes vos inscriptions ?');" style="margin-top:.75rem">
+			{{ delete_form.hidden_tag() }}
+			<p class="muted" style="margin-bottom:1rem">Votre compte et vos inscriptions seront effacés. Cette action est définitive.</p>
+			<div class="field">
+				<label for="delete-password">Confirmez avec votre mot de passe</label>
+				{% with field=delete_form.current_password, field_id="delete-password", required=true, autocomplete="current-password" %}{% include "partials/password_field.html" %}{% endwith %}
+			</div>
+			<button type="submit" class="btn btn-danger-solid btn-block" style="margin-top:1rem">Supprimer mon compte</button>
+		</form>
+	</details>
 {% endblock %}

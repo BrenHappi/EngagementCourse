@@ -1,107 +1,97 @@
 <!doctype html>
+{% from "partials/icons.html" import icon %}
 <html lang="fr">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>{% block title %}ASPTT | Courses{% endblock %}</title>
-	<link rel="icon" type="image/png" href="{{ url_for('static', filename='hermine_symbole.png') }}">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<meta name="theme-color" content="#ffffff">
+	<title>{% block title %}Courses{% endblock %} · ASPTT</title>
+	<link rel="icon" type="image/png" href="{{ url_for('static', filename='asptt.png') }}">
+	<link rel="apple-touch-icon" href="{{ url_for('static', filename='asptt.png') }}">
 	<link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 	{% block head %}{% endblock %}
 </head>
-<body class="{{ body_class | default('') }}">
-	<div class="site-shell">
+{% set endpoint = request.endpoint or '' %}
+{% set on_my_races = endpoint == 'calendar.index' and request.args.get('my_engagements') == '1' %}
+<body class="{% if current_user.is_authenticated %}has-tabbar{% endif %}">
+	{% block shell %}
 		<header class="topbar">
-			<a class="brand" href="{{ url_for('calendar.index') if current_user.is_authenticated else url_for('auth.login') }}">
-				<span class="brand-lockup">
-					<span class="brand-mark">
-						<img src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-						<img src="{{ url_for('static', filename='hermine_symbole.png') }}" alt="Hermine bretonne">
-					</span>
-					<span class="brand-copy">
-						<p class="brand-kicker">ASPTT</p>
-						<p class="brand-title">Gestion des Engagements</p>
-						<p class="brand-subtitle">Courses route</p>
-					</span>
-				</span>
-			</a>
-
-			<div class="topbar-actions">
+			<div class="topbar-inner">
+				<a class="brand" href="{{ url_for('calendar.index') }}">
+					<img src="{{ url_for('static', filename='asptt.png') }}" alt="" width="52" height="35">
+					<span class="brand-name">ASPTT<small>Engagements courses</small></span>
+				</a>
 				{% if current_user.is_authenticated %}
-					<nav class="topbar-nav" aria-label="navigation principale">
-						<a class="pill-link" href="{{ url_for('calendar.index') }}">Courses</a>
+					<nav class="topnav" aria-label="Menu principal">
+						<a href="{{ url_for('calendar.index') }}" class="{% if endpoint == 'calendar.index' and not on_my_races %}is-active{% endif %}">{{ icon('calendar') }}Courses</a>
+						<a href="{{ url_for('calendar.index', my_engagements=1) }}" class="{% if on_my_races %}is-active{% endif %}">{{ icon('flag') }}Mes courses</a>
 						{% if current_user.role == 'admin' %}
-							<a class="pill-link" href="{{ url_for('admin.admin') }}">Administration</a>
+							<a href="{{ url_for('admin.manage_engagements') }}" class="{% if endpoint.startswith('admin.') %}is-active{% endif %}">{{ icon('shield') }}Admin{% if pending_count %}<span class="count-badge" aria-label="{{ pending_count }} demande(s) à valider">{{ pending_count }}</span>{% endif %}</a>
 						{% endif %}
-					</nav>
-					<a class="button-secondary icon-btn icon-toolbar icon-profile-access" href="{{ url_for('profile.profile') }}" aria-label="Mon profil" title="Mon profil">
-						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-							<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-							<path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-						</svg>
-					</a>
-					<form method="post" action="{{ url_for('auth.logout') }}">
-						<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-						<button class="button-secondary icon-btn icon-toolbar" type="submit" aria-label="Déconnexion" title="Déconnexion">
-							<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-								<path d="M14 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-								<path d="M10 12h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-								<path d="m18 8 4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-							</svg>
-						</button>
-					</form>
-				{% else %}
-					<nav class="topbar-nav" aria-label="navigation publique">
-						<a class="pill-link" href="{{ url_for('auth.login') }}">Connexion</a>
+						<a href="{{ url_for('profile.profile') }}" class="{% if endpoint == 'profile.profile' %}is-active{% endif %}">{{ icon('user') }}Mon profil</a>
+						<form method="post" action="{{ url_for('auth.logout') }}">
+							<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+							<button type="submit" class="link-btn" title="Se déconnecter">{{ icon('logout') }}<span class="visually-hidden">Se déconnecter</span></button>
+						</form>
 					</nav>
 				{% endif %}
 			</div>
 		</header>
 
-		{% with messages = get_flashed_messages() %}
-			{% if messages %}
-				<ul class="message-list" aria-label="messages">
-					{% for message in messages %}
-						<li>{{ message }}</li>
-					{% endfor %}
-				</ul>
-			{% endif %}
-		{% endwith %}
-
-		<main class="page-main">
+		<main class="page {% block page_class %}{% endblock %}">
+			{% include "partials/flashes.html" %}
 			{% block content %}{% endblock %}
 		</main>
-	</div>
 
-	<button id="to-top" class="button-secondary icon-btn icon-toolbar to-top" type="button" aria-label="Remonter en haut" title="Remonter en haut">
-		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-			<path d="m6 14 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
-		</svg>
-	</button>
+		{% if current_user.is_authenticated %}
+			<nav class="tabbar" aria-label="Menu principal">
+				<a href="{{ url_for('calendar.index') }}" class="{% if endpoint == 'calendar.index' and not on_my_races %}is-active{% endif %}">{{ icon('calendar') }}Courses</a>
+				<a href="{{ url_for('calendar.index', my_engagements=1) }}" class="{% if on_my_races %}is-active{% endif %}">{{ icon('flag') }}Mes courses</a>
+				{% if current_user.role == 'admin' %}
+					<a href="{{ url_for('admin.manage_engagements') }}" class="{% if endpoint.startswith('admin.') %}is-active{% endif %}">{{ icon('shield') }}Admin{% if pending_count %}<span class="count-badge">{{ pending_count }}</span>{% endif %}</a>
+				{% endif %}
+				<a href="{{ url_for('profile.profile') }}" class="{% if endpoint == 'profile.profile' %}is-active{% endif %}">{{ icon('user') }}Profil</a>
+			</nav>
+		{% endif %}
+	{% endblock %}
+
+	<div class="toast-zone" id="toast-zone" aria-live="polite"></div>
 
 	<script>
 		(function () {
-			var toTopButton = document.getElementById("to-top");
-			if (!toTopButton) {
-				return;
-			}
+			var zone = document.getElementById("toast-zone");
+			var timer = null;
 
-			function updateToTopVisibility() {
-				if (window.scrollY > 420) {
-					toTopButton.classList.add("is-visible");
-				} else {
-					toTopButton.classList.remove("is-visible");
+			window.showToast = function (message, isError) {
+				zone.innerHTML = "";
+				var toast = document.createElement("div");
+				toast.className = "toast" + (isError ? " is-error" : "");
+				toast.textContent = message;
+				zone.appendChild(toast);
+				clearTimeout(timer);
+				timer = setTimeout(function () { zone.innerHTML = ""; }, isError ? 6000 : 3500);
+			};
+
+			// Message left by an action just before reloading the page
+			try {
+				var pending = sessionStorage.getItem("toast");
+				if (pending) {
+					sessionStorage.removeItem("toast");
+					window.showToast(pending, false);
 				}
-			}
+			} catch (e) {}
 
-			toTopButton.addEventListener("click", function () {
-				window.scrollTo({ top: 0, behavior: "smooth" });
+			// "Afficher" buttons next to password fields
+			document.querySelectorAll("[data-toggle-password]").forEach(function (button) {
+				button.addEventListener("click", function () {
+					var input = document.getElementById(button.getAttribute("data-toggle-password"));
+					var show = input.type === "password";
+					input.type = show ? "text" : "password";
+					button.textContent = show ? "Masquer" : "Afficher";
+				});
 			});
-
-			window.addEventListener("scroll", updateToTopVisibility, { passive: true });
-			updateToTopVisibility();
 		})();
 	</script>
-
 	{% block scripts %}{% endblock %}
 </body>
 </html>

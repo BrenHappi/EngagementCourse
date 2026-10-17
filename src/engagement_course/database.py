@@ -400,6 +400,7 @@ class DatabaseRepository:
 
         if where:
             query += " WHERE " + " AND ".join(where)
+        query += " ORDER BY r.date, r.id"
 
         with self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
@@ -784,7 +785,7 @@ class DatabaseRepository:
                 """
                 SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
-                WHERE email = ?
+                WHERE email = ? COLLATE NOCASE
                 """,
                 (email,)
             ).fetchone()
@@ -814,7 +815,7 @@ class DatabaseRepository:
                 """
                 SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
-                WHERE username = ?
+                WHERE username = ? COLLATE NOCASE
                 """,
                 (username,)
             ).fetchone()
@@ -888,6 +889,8 @@ class DatabaseRepository:
                 SELECT id, email, username, password, category_key, managed_categories, firstname, lastname, role, address, address_lat, address_lon
                 FROM users
                 WHERE role = 'admin' AND managed_categories LIKE ?
+                -- The dedicated manager of the category rather than an admin managing everything
+                ORDER BY length(managed_categories), id
                 """,
                 (f"%{category.to_key()}%",)
             ).fetchone()

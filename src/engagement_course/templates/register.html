@@ -1,70 +1,48 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 
-{% block title %}Inscription | Engagement Course{% endblock %}
+{% block title %}Créer mon compte{% endblock %}
+{% block heading %}Créer mon compte{% endblock %}
+{% block lead %}<p>Quelques informations et c'est parti.</p>{% endblock %}
 
-{% block content %}
-  <section class="auth-wrap">
-    <div class="auth-panel">
-      <div class="auth-grid">
-        <div class="auth-aside">
-          <div class="aside-mark">
-            <img class="auth-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-          </div>
-          <p class="eyebrow">Inscription</p>
-          <h1>Nouveau compte</h1>
-          <p class="hero-copy">Accès club.</p>
-          <div class="split-line"></div>
-          <div class="tag-list" aria-label="palette club">
-            <span class="tag">Noir</span>
-            <span class="tag">Bleu nuit</span>
-            <span class="tag tag-accent">Bleu ciel</span>
-          </div>
-        </div>
-        <div class="auth-form">
-          <div>
-            <h2>S'inscrire</h2>
-          </div>
+{% block form %}
+	<form method="post" action="{{ url_for('auth.register') }}">
+		{{ form.hidden_tag() }}
+		<div class="field-grid">
+			<div class="field">
+				<label for="firstname">Prénom</label>
+				{{ form.firstname(id="firstname", type="text", required=true, autocomplete="given-name") }}
+			</div>
+			<div class="field">
+				<label for="lastname">Nom</label>
+				{{ form.lastname(id="lastname", type="text", required=true, autocomplete="family-name") }}
+			</div>
+			<div class="field span-2">
+				<label for="email">Email</label>
+				{{ form.email(id="email", type="email", required=true, autocomplete="email", autocapitalize="none") }}
+				<p class="field-help">Vous l'utiliserez pour vous connecter.</p>
+			</div>
+			<div class="field span-2">
+				<label for="category">Ma catégorie</label>
+				{{ form.category(id="category", required=true) }}
+			</div>
+			<div class="field span-2">
+				<label for="address">Mon adresse <span class="label-hint">(facultatif)</span></label>
+				{{ form.address(id="address", type="text", autocomplete="street-address") }}
+				<p class="field-help">Sert uniquement à afficher la distance jusqu'aux courses.</p>
+			</div>
+			<div class="field span-2">
+				<label for="password">Mot de passe</label>
+				{% with field=form.password, field_id="password", required=true, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+			</div>
+			<div class="field span-2">
+				<label for="confirm_password">Mot de passe, encore une fois</label>
+				{% with field=form.confirm_password, field_id="confirm_password", required=true, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+			</div>
+		</div>
+		<button type="submit" class="btn btn-block">Créer mon compte</button>
+	</form>
+{% endblock %}
 
-          <form method="post" action="{{ url_for('auth.register') }}">
-            {{ form.hidden_tag() }}
-            <div class="field-grid">
-              <div class="field">
-                <label for="firstname">Prénom</label>
-                {{ form.firstname(id="firstname", type="text", required=true, placeholder="Prénom") }}
-              </div>
-              <div class="field">
-                <label for="lastname">Nom</label>
-                {{ form.lastname(id="lastname", type="text", required=true, placeholder="Nom") }}
-              </div>
-              <div class="field">
-                <label for="username">Nom d'utilisateur</label>
-                {{ form.username(id="username", type="text", placeholder="Optionnel") }}
-              </div>
-              <div class="field">
-                <label for="category">Catégorie</label>
-                {{ form.category(id="category", required=true) }}
-              </div>
-              <div class="field field-span-2">
-                <label for="email">Email</label>
-                {{ form.email(id="email", type="email", required=true, placeholder="Email ou username") }}
-              </div>
-              <div class="field field-span-2">
-                <label for="password">Mot de passe</label>
-                {{ form.password(id="password", type="password", required=true, placeholder="Mot de passe") }}
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit">Créer le compte</button>
-            </div>
-          </form>
-
-          <div class="auth-links">
-            <span class="muted">Déjà inscrit</span>
-            <a class="pill-link" href="{{ url_for('auth.login') }}">Se connecter</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+{% block foot %}
+	<p>Déjà un compte ? <a href="{{ url_for('auth.login') }}">Se connecter</a></p>
 {% endblock %}

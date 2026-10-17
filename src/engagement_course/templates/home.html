@@ -1,301 +1,254 @@
 {% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}{{ 'Mes courses' if show_my_engagements else 'Courses' }}{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
 
 {% block content %}
-	{% set selected_departments = request.args.getlist('department') %}
-	{% set selected_categories = selected_category_keys if selected_category_keys is defined else request.args.getlist('category') %}
-	{% set category_filter_mode = category_filter_mode if category_filter_mode is defined else 'none' %}
-	{% set show_my_engagements = show_my_engagements if show_my_engagements is defined else (request.args.get('my_engagements') == '1') %}
-	{% set show_past_races = show_past_races if show_past_races is defined else (request.args.get('show_past') == '1') %}
-	{% set max_distance = max_distance if max_distance is defined else (request.args.get('max_distance')|int if request.args.get('max_distance') else 200) %}
-	{% set user_has_address = user_has_address if user_has_address is defined else false %}
-	{% set access_numbers = available_category_filters.get('ACCESS', []) %}
-	{% set open_numbers = available_category_filters.get('OPEN', []) %}
+	{% set short_months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] %}
+	{% set short_days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] %}
+	{% set status_labels = {'validated': 'Inscrit', 'pending': 'En attente', 'interested': 'Intéressé'} %}
 
-	{# ── Page header + month nav ─────────────────────────────────────── #}
-	<div class="cal-header">
-		<div class="cal-header-left">
-			<p class="eyebrow">Calendrier</p>
-			<h1 class="cal-title">Courses</h1>
-		</div>
-		<div class="cal-month-nav">
-			<a class="cal-nav-btn" href="{{ prev_url }}" aria-label="Mois précédent">&#8592;</a>
-			<span class="cal-month-label">{{ month_label }}</span>
-			<a class="cal-nav-btn" href="{{ next_url }}" aria-label="Mois suivant">&#8594;</a>
-		</div>
-		<div class="cal-header-right">
-			<span class="chip">{{ races|length }} course{% if races|length != 1 %}s{% endif %}</span>
-			<a class="button-ghost button-sm" href="{{ url_for('calendar.index', reset=1) }}">Réinitialiser</a>
-		</div>
-	</div>
-
-	{# ── Compact filter bar ──────────────────────────────────────────── #}
-	<form method="get" action="{{ url_for('calendar.index') }}" class="filter-bar" id="filter-bar-form">
-		<input type="hidden" name="category_filter_submitted" value="1">
-		<input type="hidden" name="month" value="{{ current_month }}">
-		<input type="hidden" name="year" value="{{ current_year }}">
-
-		<div class="filter-bar-group">
-			<span class="filter-bar-label">Dép.</span>
-			{% for dept in available_departments %}
-				<label class="chip chip-toggle {% if dept|string in selected_departments %}chip-toggle-active{% endif %}">
-					<input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
-					{{ dept }}
-				</label>
-			{% endfor %}
-		</div>
-
-		<div class="filter-bar-sep"></div>
-
-		<div class="filter-bar-group">
-			<span class="filter-bar-label">Cat.</span>
-			{% for num in access_numbers %}
-				{% set key = 'ACCESS_' ~ num %}
-				<label class="chip chip-toggle chip-toggle-access {% if key in selected_categories %}chip-toggle-active{% endif %}">
-					<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
-					A{{ num }}
-				</label>
-			{% endfor %}
-			{% for num in open_numbers %}
-				{% set key = 'OPEN_' ~ num %}
-				<label class="chip chip-toggle {% if key in selected_categories %}chip-toggle-active{% endif %}">
-					<input type="checkbox" name="category" value="{{ key }}" {% if key in selected_categories %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
-					O{{ num }}
-				</label>
-			{% endfor %}
-		</div>
-
-		<div class="filter-bar-sep"></div>
-
-		<div class="filter-bar-group">
-			<span class="filter-bar-label">Vue</span>
-			<label class="chip chip-toggle {% if show_my_engagements %}chip-toggle-active{% endif %}">
-				<input type="checkbox" name="my_engagements" value="1" {% if show_my_engagements %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
-				Mes courses
-			</label>
-			<label class="chip chip-toggle {% if show_past_races %}chip-toggle-active{% endif %}">
-				<input type="checkbox" name="show_past" value="1" {% if show_past_races %}checked{% endif %} onchange="document.getElementById('filter-bar-form').submit()">
-				Afficher passees
-			</label>
-		</div>
-
-		<div class="filter-bar-sep"></div>
-
-		<div class="filter-bar-group filter-bar-distance">
-			<span class="filter-bar-label">Rayon</span>
-			<div class="distance-slider-wrap {% if not user_has_address %}distance-slider-wrap-disabled{% endif %}" {% if not user_has_address %}title="Ajoutez une adresse dans votre profil pour activer ce filtre"{% endif %}>
-				<input
-					type="range"
-					name="max_distance"
-					min="30"
-					max="200"
-					step="10"
-					value="{{ max_distance }}"
-					class="distance-slider"
-					{% if not user_has_address %}disabled aria-disabled="true"{% endif %}
-					oninput="document.getElementById('distance-value').textContent = this.value + ' km'"
-					onchange="document.getElementById('filter-bar-form').submit()"
-				>
-				<span class="distance-slider-value" id="distance-value">{{ max_distance }} km</span>
+	{% if show_my_engagements %}
+		<div class="page-head">
+			<div>
+				<h1>Mes courses</h1>
+				<p>{{ 'Toutes vos courses, passées comprises.' if show_past_races else 'Les courses à venir où vous êtes inscrit, en attente ou intéressé.' }}</p>
 			</div>
-			{% if not user_has_address %}
-				<span class="filter-bar-hint">Ajoutez une adresse dans votre profil pour activer le filtre de distance.</span>
+			{% if show_past_races %}
+				<a class="btn btn-secondary btn-sm" href="{{ url_for('calendar.index', my_engagements=1) }}">Masquer les courses passées</a>
+			{% else %}
+				<a class="btn btn-secondary btn-sm" href="{{ url_for('calendar.index', my_engagements=1, show_past=1) }}">Voir aussi les courses passées</a>
 			{% endif %}
 		</div>
-
-		{% if category_filter_mode == 'default' %}
-			<span class="filter-bar-hint">Filtre par défaut : votre catégorie</span>
-		{% endif %}
-	</form>
-
-	{# ── Race table ──────────────────────────────────────────────────── #}
-	{% if races %}
-		<div class="race-table-wrap">
-			<table class="race-table">
-				<thead>
-					<tr>
-						<th class="col-date">Date</th>
-						<th class="col-loc">Lieu</th>
-						<th class="col-distance">Distance</th>
-						<th class="col-fed">Fédé</th>
-						<th class="col-type">Type</th>
-						<th class="col-cat">Catégories</th>
-						<th class="col-pax" title="Inscrits / En attente / Intéressés">Participants</th>
-						<th class="col-status">Statut</th>
-						<th class="col-actions">Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{% for race in races %}
-						{% set my_status = race.my_status if race.my_status is defined else '' %}
-						{% set my_engagement_id = race.my_engagement_id if race.my_engagement_id is defined else none %}
-						{% set is_engaged = my_status in ['pending', 'validated'] %}
-						{% set validated_users = race.validated_users if race.validated_users is defined else [] %}
-						{% set pending_users = race.pending_users if race.pending_users is defined else [] %}
-						{% set interested_users = race.interested_users if race.interested_users is defined else [] %}
-						{% set vc = validated_users|length %}
-						{% set pc = pending_users|length %}
-						{% set ic = interested_users|length %}
-						<tr class="race-row race-row-{{ my_status if my_status else 'none' }}" id="race-{{ race.id }}">
-							<td class="col-date">
-								<span class="race-date-day">{{ race.race_day[:3] }}</span>
-								<span class="race-date-val">{{ race.display_date() }}</span>
-							</td>
-							<td class="col-loc">
-								<span class="race-loc">{{ race.location }}</span>
-								<span class="race-dept-badge">{{ race.department }}</span>
-							</td>
-							<td class="col-distance">
-								{% if race.distance_km is not none %}
-									<span class="race-distance-value">{{ "%.1f"|format(race.distance_km) }} km</span>
-								{% else %}
-									<span class="race-distance-value race-distance-empty">—</span>
-								{% endif %}
-							</td>
-							<td class="col-fed">{{ race.federation }}</td>
-							<td class="col-type">{{ race.type }}</td>
-							<td class="col-cat">
-								{% if not race.requires_category_match %}
-									<span class="cat-label">{{ race.categories_label or '—' }}</span>
-								{% elif race.categories %}
-									{% for cat in race.categories %}
-										<span class="cat-tag" title="{{ cat.level }} {{ cat.number }}">{{ cat.level[0] }}{{ cat.number }}</span>
-									{% endfor %}
-								{% else %}
-									<span class="cat-tag cat-tag-empty">—</span>
-								{% endif %}
-							</td>
-							<td class="col-pax">
-								{% if vc > 0 %}
-									<span class="pax-chip pax-validated" tabindex="0">✓{{ vc }}<span class="pax-popover"><ul>{% for u in validated_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
-								{% endif %}
-								{% if pc > 0 %}
-									<span class="pax-chip pax-pending" tabindex="0">⏳{{ pc }}<span class="pax-popover"><ul>{% for u in pending_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
-								{% endif %}
-								{% if ic > 0 %}
-									<span class="pax-chip pax-interested" tabindex="0">★{{ ic }}<span class="pax-popover"><ul>{% for u in interested_users %}<li>{{ u.username }}{% if u.category %} <span class="pax-cat">[{{ u.category.level[0] }}{{ u.category.number }}]</span>{% endif %}</li>{% endfor %}</ul></span></span>
-								{% endif %}
-								{% if vc == 0 and pc == 0 and ic == 0 %}
-									<span class="pax-none">—</span>
-								{% endif %}
-							</td>
-							<td class="col-status">
-								<span class="status-dot status-dot-{{ my_status if my_status else 'none' }}" title="{{ my_status if my_status else 'aucun statut' }}"></span>
-							</td>
-							<td class="col-actions">
-								{% if my_status == 'validated' %}
-									<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="PATCH">
-										<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-										<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-										<input type="hidden" name="race_id" value="{{ race.id }}">
-										<button type="submit" name="status" value="cancelled" class="action-btn action-btn-cancel" title="Annuler participation">✕</button>
-									</form>
-								{% elif my_status == 'cancelled' %}
-									<span class="action-btn-disabled" title="Annulé">—</span>
-								{% else %}
-									<form method="post" action="{{ url_for('api.update_engagement', engagement_id=my_engagement_id) if my_engagement_id else url_for('api.create_engagement') }}" data-engagement-form="true" data-api-method="{{ 'PATCH' if my_engagement_id else 'POST' }}" style="display:contents">
-										<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-										<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-										<input type="hidden" name="race_id" value="{{ race.id }}">
-										<button type="submit" name="status" value="interested" class="action-btn action-btn-star {% if my_status == 'interested' %}action-btn-active{% endif %}" title="Intéressé">★</button>
-										<button type="submit" name="status" value="pending" class="action-btn action-btn-plus {% if is_engaged %}action-btn-active{% endif %}" title="Demande d'inscription">+</button>
-									</form>
-									{% if my_engagement_id %}
-										<form method="post" action="{{ url_for('api.delete_engagement', engagement_id=my_engagement_id) }}" data-engagement-form="true" data-api-method="DELETE" style="display:contents">
-											<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-											<input type="hidden" name="user_id" value="{{ current_user.user_id }}">
-											<input type="hidden" name="race_id" value="{{ race.id }}">
-											<button type="submit" class="action-btn action-btn-cancel" title="Supprimer l'engagement">✕</button>
-										</form>
-									{% endif %}
-								{% endif %}
-							</td>
-						</tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
 	{% else %}
-		<div class="empty-state">Aucune course ce mois-ci avec les filtres actuels.</div>
+		{% set prev_index = (current_month - 2) % 12 %}
+		{% set next_index = current_month % 12 %}
+		<div class="month-nav">
+			<a class="month-btn" href="{{ prev_url }}" aria-label="Mois précédent">{{ icon('chevron-left') }}<span class="month-btn-label">{{ short_months[prev_index]|capitalize }}</span></a>
+			<h1>{{ month_label }}</h1>
+			<a class="month-btn" href="{{ next_url }}" aria-label="Mois suivant"><span class="month-btn-label">{{ short_months[next_index]|capitalize }}</span>{{ icon('chevron-right') }}</a>
+		</div>
+
+		{% if not current_user.category %}
+			<p class="flash flash-info" style="margin-bottom:1rem">Indiquez votre catégorie dans <a href="{{ url_for('profile.profile') }}">votre profil</a> pour voir directement les courses qui vous concernent.</p>
+		{% endif %}
+
+		{# ── Filters ─────────────────────────────────────── #}
+		{% set category_options = [] %}
+		{% for level, numbers in available_category_filters.items() %}
+			{% for number in numbers %}
+				{% set _ = category_options.append((level ~ '_' ~ number, level|capitalize ~ ' ' ~ number)) %}
+			{% endfor %}
+		{% endfor %}
+		{% set active = [] %}
+		{% if selected_category_keys %}
+			{% set _ = active.append(category_options|selectattr(0, 'in', selected_category_keys)|map(attribute=1)|join(', ')) %}
+		{% else %}
+			{% set _ = active.append('Toutes catégories') %}
+		{% endif %}
+		{% if selected_departments %}{% set _ = active.append('Dép. ' ~ selected_departments|join(', ')) %}{% endif %}
+		{% if user_has_address and max_distance < 200 %}{% set _ = active.append('≤ ' ~ max_distance ~ ' km') %}{% endif %}
+		{% if show_past_races %}{% set _ = active.append('passées incluses') %}{% endif %}
+
+		<details class="filters disclosure">
+			<summary>
+				<span class="filters-summary">{{ icon('filter') }}<span>Filtres</span><span class="filters-active">{{ active|join(' · ') }}</span></span>
+			</summary>
+			<form method="get" action="{{ url_for('calendar.index') }}" class="filters-body">
+				<input type="hidden" name="category_filter_submitted" value="1">
+				<input type="hidden" name="month" value="{{ current_month }}">
+				<input type="hidden" name="year" value="{{ current_year }}">
+
+				<fieldset class="filter-group" style="border:0;padding:0;margin-inline:0">
+					<legend class="label">Catégories</legend>
+					<div class="chips">
+						{% for key, label in category_options %}
+							<label class="chip-choice"><input type="checkbox" name="category" value="{{ key }}" {% if key in selected_category_keys %}checked{% endif %}><span>{{ label }}</span></label>
+						{% endfor %}
+					</div>
+					{% if category_filter_mode == 'default' %}<p class="field-help">Votre catégorie est sélectionnée par défaut.</p>{% endif %}
+				</fieldset>
+
+				<fieldset class="filter-group" style="border:0;padding:0;margin-inline:0">
+					<legend class="label">Départements</legend>
+					<div class="chips">
+						{% for dept in available_departments %}
+							<label class="chip-choice"><input type="checkbox" name="department" value="{{ dept }}" {% if dept|string in selected_departments %}checked{% endif %}><span>{{ department_names.get(dept, dept) }} ({{ dept }})</span></label>
+						{% endfor %}
+					</div>
+					<p class="field-help">Aucun coché : tous les départements.</p>
+				</fieldset>
+
+				<div class="filter-group">
+					<label for="max-distance">Distance maximum depuis chez moi</label>
+					<div class="distance-row">
+						<input type="range" id="max-distance" name="max_distance" min="30" max="200" step="10" value="{{ max_distance }}" {% if not user_has_address %}disabled{% endif %} oninput="document.getElementById('distance-value').value = this.value == 200 ? 'Tout' : this.value + ' km'">
+						<output id="distance-value" for="max-distance">{{ 'Tout' if max_distance >= 200 else max_distance ~ ' km' }}</output>
+					</div>
+					{% if not user_has_address %}
+						<p class="field-help">Ajoutez votre adresse dans <a href="{{ url_for('profile.profile') }}">votre profil</a> pour utiliser ce filtre.</p>
+					{% endif %}
+				</div>
+
+				<div class="filter-group">
+					<label class="check"><input type="checkbox" name="show_past" value="1" {% if show_past_races %}checked{% endif %}>Afficher aussi les courses passées</label>
+				</div>
+
+				<div class="filter-actions">
+					<button type="submit" class="btn">Afficher les courses</button>
+					<a class="btn btn-secondary" href="{{ url_for('calendar.index', reset=1, month=current_month, year=current_year) }}">Tout effacer</a>
+				</div>
+			</form>
+		</details>
 	{% endif %}
 
+	{# ── Races ───────────────────────────────────────────── #}
+	{% if races %}
+		<p class="list-count">{{ races|length }} course{{ 's' if races|length > 1 }}</p>
+		<div class="race-list">
+			{% for race in races %}
+				{% set status = race.my_status if race.my_status in ['interested', 'pending', 'validated', 'cancelled'] else 'none' %}
+				{% set engagement_id = race.my_engagement_id %}
+				{% set is_past = race.date.date() < today %}
+				{% set riders = [] %}
+				{% for u in race.validated_users %}{% set _ = riders.append((u, 'validated')) %}{% endfor %}
+				{% for u in race.pending_users %}{% set _ = riders.append((u, 'pending')) %}{% endfor %}
+				{% for u in race.interested_users %}{% set _ = riders.append((u, 'interested')) %}{% endfor %}
+				{% set update_url = url_for('api.update_engagement', engagement_id=engagement_id) if engagement_id else '' %}
+				{% set delete_url = url_for('api.delete_engagement', engagement_id=engagement_id) if engagement_id else '' %}
+
+				{# One dense row per race; tapping it shows the details and the other actions #}
+				<details class="race is-{{ status }}{% if is_past %} is-past{% endif %}" id="race-{{ race.id }}">
+					<summary class="race-row">
+						<span class="race-date">
+							<span class="dow">{{ short_days[race.date.weekday()] }}</span>
+							<span class="day">{{ race.date.day }}</span>
+							{% if show_my_engagements %}<span class="mon">{{ short_months[race.date.month - 1] }}</span>{% endif %}
+						</span>
+						<span class="race-main">
+							<span class="race-title">{{ race.display_location }}</span>
+							<span class="race-meta">
+								{%- if status == 'validated' %}<b class="st st-validated">✓ Inscrit</b> · {% elif status == 'pending' %}<b class="st st-pending">En attente</b> · {% elif status == 'cancelled' %}<b class="st st-cancelled">Refusée</b> · {% elif status == 'interested' %}<b class="st st-interested">★</b> {% endif -%}
+								{{ race.department }}{% if race.distance_km is not none %} · {{ "%.0f"|format(race.distance_km) }} km{% endif %} · {{ race.type_label }}
+								{%- if riders %} · {{ icon('users') }}{{ riders|length }}{% endif -%}
+							</span>
+						</span>
+						<span class="race-side">
+							{% if status in ['validated', 'pending', 'cancelled'] or is_past %}
+							{% elif race.is_open and status == 'none' %}
+								<button type="button" class="btn btn-sm" data-engage="POST" data-race="{{ race.id }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
+							{% elif race.is_open %}
+								<button type="button" class="btn btn-sm" data-engage="PATCH" data-url="{{ update_url }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
+							{% else %}
+								<span class="closed">Closes</span>
+							{% endif %}
+						</span>
+					</summary>
+
+					<div class="race-more">
+						<p class="race-facts">
+							{{ race.long_date() }} · {{ race.department_name }} ({{ race.department }}) · {{ race.type_label }} {{ race.federation }}
+							{% if status in ['none', 'interested'] and not is_past %}
+								<br>{% if race.is_open %}Inscriptions jusqu'au {{ race.closing_date().day }} {{ short_months[race.closing_date().month - 1] }}{% else %}Inscriptions closes (moins de 5 jours avant la course){% endif %}
+							{% endif %}
+						</p>
+						<div class="race-cats">
+							{% if not race.requires_category_match %}
+								{% for label in ((race.categories_label or '')|upper).split(' · ') if label %}<span class="tag">{{ label }}</span>{% endfor %}
+							{% else %}
+								{% for cat in race.categories %}<span class="tag">{{ cat.label }}</span>{% endfor %}
+							{% endif %}
+						</div>
+
+						{% if riders %}
+							<ul class="riders">
+								{% for user, rider_status in riders %}
+									<li>
+										<span>{{ user.firstname }} {{ user.lastname }}{% if user.category %} <span class="muted small">· {{ user.category.label }}</span>{% endif %}</span>
+										<span class="badge badge-{{ rider_status }}">{{ status_labels[rider_status] }}</span>
+									</li>
+								{% endfor %}
+							</ul>
+						{% endif %}
+
+						{% if not is_past %}
+							<div class="race-actions">
+								{% if status == 'none' and race.is_open %}
+									<button type="button" class="btn btn-secondary btn-sm" data-engage="POST" data-race="{{ race.id }}" data-status="interested" data-done="Course ajoutée à « Mes courses ».">☆ Ça m'intéresse</button>
+								{% elif status == 'interested' %}
+									<button type="button" class="btn btn-secondary btn-sm" data-engage="DELETE" data-url="{{ delete_url }}" data-done="Course retirée de « Mes courses ».">Ça ne m'intéresse plus</button>
+								{% elif status == 'pending' %}
+									<button type="button" class="btn btn-danger btn-sm" data-engage="DELETE" data-url="{{ delete_url }}" data-confirm="Annuler votre demande d'inscription à {{ race.display_location }} ?" data-done="Demande annulée.">Annuler ma demande</button>
+								{% elif status == 'validated' %}
+									<button type="button" class="btn btn-danger btn-sm" data-engage="PATCH" data-url="{{ update_url }}" data-status="cancelled" data-confirm="Vous êtes inscrit à {{ race.display_location }}. Annuler votre participation ? Votre responsable sera prévenu." data-done="Participation annulée, votre responsable est prévenu.">Annuler ma participation</button>
+								{% endif %}
+							</div>
+						{% endif %}
+					</div>
+				</details>
+			{% endfor %}
+		</div>
+	{% else %}
+		<div class="empty">
+			{% if show_my_engagements %}
+				<strong>Aucune course prévue pour l'instant</strong>
+				Choisissez vos courses dans le calendrier avec le bouton « S'inscrire ».
+				<br><a class="btn" href="{{ url_for('calendar.index') }}">Voir le calendrier</a>
+			{% else %}
+				<strong>Aucune course trouvée</strong>
+				Pas de course en {{ month_label|lower }} avec ces filtres.
+				<br><a class="btn btn-secondary" href="{{ url_for('calendar.index', reset=1, month=current_month, year=current_year) }}">Voir toutes les courses du mois</a>
+			{% endif %}
+		</div>
+	{% endif %}
 {% endblock %}
 
 {% block scripts %}
 	<script>
 		(function () {
-			function getCsrfToken(form) {
-				var csrfInput = form.querySelector('input[name="csrf_token"]');
-				return csrfInput ? csrfInput.value : "";
-			}
+			var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+			var userId = {{ current_user.user_id }};
 
-			async function apiCall(method, url, payload, csrfToken) {
-				var headers = {
-					"Content-Type": "application/json",
-					"X-Requested-With": "XMLHttpRequest",
-					"X-CSRFToken": csrfToken
-				};
-
-				var response = await fetch(url, {
-method: method,
-body: method === "DELETE" ? null : JSON.stringify(payload),
-headers: headers
-});
-
-				var data = null;
-				try {
-					data = await response.json();
-				} catch (e) {}
-
-				return { ok: response.ok, status: response.status, data: data };
-			}
-
-			function getErrorMessage(result) {
-				if (result && result.data && result.data.message) {
-					return result.data.message;
-				}
-				return "Une erreur est survenue";
-			}
-
-			async function handleEngagementSubmit(form, submitter) {
-				var apiMethod = (form.dataset.apiMethod || "POST").toUpperCase();
-				var button = submitter || form.querySelector('button[type="submit"]');
+			document.addEventListener("click", async function (event) {
+				var button = event.target.closest("[data-engage]");
 				if (!button) return;
+				event.preventDefault();  // a button inside the race row must not open it
+
+				var question = button.getAttribute("data-confirm");
+				if (question && !window.confirm(question)) return;
+
+				var method = button.getAttribute("data-engage");
+				var status = button.getAttribute("data-status");
+				var url = button.getAttribute("data-url") || "{{ url_for('api.create_engagement') }}";
+				var payload = null;
+				if (method === "POST") {
+					payload = { user_id: userId, race_id: Number(button.getAttribute("data-race")), status: status };
+				} else if (method === "PATCH") {
+					payload = { status: status };
+				}
 
 				button.disabled = true;
-
 				try {
-					var payload = null;
+					var response = await fetch(url, {
+						method: method,
+						headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+						body: payload ? JSON.stringify(payload) : null
+					});
+					var data = null;
+					try { data = await response.json(); } catch (e) {}
 
-					if (apiMethod === "POST") {
-						payload = {
-							user_id: Number(form.querySelector('input[name="user_id"]').value),
-							race_id: Number(form.querySelector('input[name="race_id"]').value),
-							status: submitter && submitter.name === "status" ? submitter.value : ""
-						};
-					} else if (apiMethod === "PATCH") {
-						payload = { status: submitter && submitter.name === "status" ? submitter.value : "" };
-					}
-
-					var result = await apiCall(apiMethod, form.action, payload, getCsrfToken(form));
-
-					if (!result.ok) {
-						alert(getErrorMessage(result));
+					if (!response.ok) {
+						window.showToast((data && data.message) || "Une erreur est survenue, réessayez.", true);
+						button.disabled = false;
 						return;
 					}
-
+					try { sessionStorage.setItem("toast", button.getAttribute("data-done")); } catch (e) {}
 					window.location.reload();
 				} catch (error) {
-					alert("Impossible de contacter le serveur");
-				} finally {
+					window.showToast("Pas de connexion internet ? Réessayez dans un instant.", true);
 					button.disabled = false;
 				}
-			}
-
-			document.addEventListener("submit", function (event) {
-var form = event.target;
-				if (!form || form.dataset.engagementForm !== "true") return;
-				event.preventDefault();
-				handleEngagementSubmit(form, event.submitter);
 			});
 		})();
 	</script>

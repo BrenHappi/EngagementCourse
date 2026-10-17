@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block shell %}
+	<main class="auth">
+		<div class="auth-card">
+			<div class="auth-head">
+				<img class="auth-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="ASPTT" width="120" height="81">
+				<h1>{% block heading %}{% endblock %}</h1>
+				{% block lead %}{% endblock %}
+			</div>
+			{% include "partials/flashes.html" %}
+			<div class="card">
+				{% block form %}{% endblock %}
+			</div>
+			<div class="auth-foot">
+				{% block foot %}{% endblock %}
+			</div>
+		</div>
+	</main>
+{% endblock %}

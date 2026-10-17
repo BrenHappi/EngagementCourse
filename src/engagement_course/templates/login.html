@@ -1,56 +1,26 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 
-{% block title %}Connexion | Engagement Course{% endblock %}
+{% block title %}Connexion{% endblock %}
+{% block heading %}Engagements aux courses{% endblock %}
+{% block lead %}<p>Connectez-vous pour vous inscrire aux courses du club.</p>{% endblock %}
 
-{% block content %}
-  <section class="auth-wrap">
-    <div class="auth-panel">
-      <div class="auth-grid">
-        <div class="auth-aside">
-          <div class="aside-mark">
-            <img class="auth-logo" src="{{ url_for('static', filename='asptt.png') }}" alt="Logo ASPTT">
-          </div>
-          <p class="eyebrow">Connexion</p>
-          <h1>ASPTT</h1>
-          <p class="hero-copy">Accès membre.</p>
-          <div class="split-line"></div>
-          <div class="tag-list" aria-label="palette club">
-            <span class="tag">Noir</span>
-            <span class="tag">Bleu nuit</span>
-            <span class="tag tag-accent">Bleu ciel</span>
-          </div>
-        </div>
-        <div class="auth-form">
-          <div>
-            <h2>Se connecter</h2>
-          </div>
+{% block form %}
+	<form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+		{{ form.hidden_tag() }}
+		<div class="field">
+			<label for="email_or_username">Email</label>
+			{{ form.email_or_username(id="email_or_username", type="text", required=true, autocomplete="username", autocapitalize="none", spellcheck="false", inputmode="email") }}
+			<p class="field-help">Ou votre nom d'utilisateur.</p>
+		</div>
+		<div class="field">
+			<label for="password">Mot de passe</label>
+			{% with field=form.password, field_id="password", required=true, autocomplete="current-password" %}{% include "partials/password_field.html" %}{% endwith %}
+		</div>
+		<button type="submit" class="btn btn-block">Se connecter</button>
+	</form>
+{% endblock %}
 
-          <form method="post" action="{{ url_for('auth.login') }}">
-            {{ form.hidden_tag() }}
-
-            <div class="field-block full">
-              <label for="email_or_username">Email ou nom d'utilisateur</label>
-              {{ form.email_or_username(id="email_or_username", type="text", required=true, placeholder="Email ou username") }}
-            </div>
-
-            <div class="field-block full">
-              <label for="password">Mot de passe</label>
-              {{ form.password(id="password", type="password", required=true, placeholder="Mot de passe") }}
-            </div>
-
-            <div class="form-actions">
-              <button type="submit">Connexion</button>
-            </div>
-          </form>
-
-          <div class="auth-links">
-            <a class="pill-link" href="{{ url_for('auth.forgot_password') }}">Mot de passe oublié ?</a>
-          </div>
-          <div class="auth-links">
-            <span class="muted">Nouveau membre ? Demandez le lien d'inscription à votre responsable.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+{% block foot %}
+	<a href="{{ url_for('auth.forgot_password') }}">Mot de passe oublié ?</a>
+	<p class="small">Pas encore de compte ? Demandez le lien d'inscription à votre responsable de catégorie.</p>
 {% endblock %}

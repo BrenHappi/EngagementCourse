@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from enum import Enum
 import re
 import unicodedata
@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from bcrypt import checkpw
 import flask_login
 
-from engagement_course.config import DATE_FORMAT
+from engagement_course.config import DATE_FORMAT, DEPARTMENT_NAMES, ENGAGEMENT_CLOSING_DAYS
+
+WEEKDAY_LABELS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+MONTH_LABELS = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+]
 
 USER_ROLES = {
     1: "admin",
@@ -191,11 +197,16 @@ class Category:
         for level, numbers in CATEGORIES.items():
             for number in numbers:
                 key = f"{level}_{number}"
-                options.append((key, f"{level} {number}"))
+                options.append((key, Category(level, number).label))
         return options
 
     def to_key(self) -> str:
-        return f"{self.level}_{self.number}"    
+        return f"{self.level}_{self.number}"
+
+    @property
+    def label(self) -> str:
+        """e.g. "Access 2" """
+        return f"{self.level.capitalize()} {self.number}"
 
 
 class RaceEvent:
@@ -237,6 +248,30 @@ class RaceEvent:
     
     def display_date(self) -> str:
         return self.date.strftime(DATE_FORMAT)
+
+    def long_date(self) -> str:
+        """e.g. "Samedi 25 octobre" """
+        return f"{WEEKDAY_LABELS[self.date.weekday()]} {self.date.day} {MONTH_LABELS[self.date.month - 1].lower()}"
+
+    @property
+    def display_location(self) -> str:
+        """Tidies FFC spacing: "Pleven ( la chauvinais )" -> "Pleven (la chauvinais)"."""
+        location = re.sub(r"\(\s+", "(", re.sub(r"\s+\)", ")", self.location))
+        return location[:1].upper() + location[1:]
+
+    @property
+    def type_label(self) -> str:
+        return {ROAD_RACE_TYPE: "Route", CYCLOCROSS_RACE_TYPE: "Cyclo-cross"}.get(self.type, (self.type or "").capitalize())
+
+    @property
+    def department_name(self) -> str:
+        return DEPARTMENT_NAMES.get(self.department, str(self.department))
+
+    def closing_date(self) -> date:
+        return self.date - timedelta(days=ENGAGEMENT_CLOSING_DAYS)
+
+    def is_open_for_engagement(self, now: datetime) -> bool:
+        return now + timedelta(days=ENGAGEMENT_CLOSING_DAYS) <= self.date
 
     @property
     def requires_category_match(self) -> bool:
@@ -315,7 +350,6 @@ class Engagement:
     def __repr__(self):
         return f"Engagement(id={self.id}, user={self.user}, race={self.race}, status='{self.status}')"
 
-WEEKDAY_LABELS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
 
 class RecapSettings:

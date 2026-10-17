@@ -9,6 +9,7 @@ def register(client, token, email="new@test.fr"):
         "category": "OPEN_1",
         "email": email,
         "password": "secret",
+        "confirm_password": "secret",
     })
 
 

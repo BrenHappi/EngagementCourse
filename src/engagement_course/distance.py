@@ -1,15 +1,30 @@
 import math
+import time
 from typing import Optional
 
 import requests
 
 GEOCODER_URL = "https://data.geopf.fr/geocodage/search"
+GEOCODER_TIMEOUT = 5  # seconds
+# Unknown places are not stored in the database: remember them for a while so that
+# every calendar page does not wait on the geocoder again
+FAILED_LOOKUP_TTL = 24 * 3600  # seconds
+_failed_lookups: dict[str, float] = {}
 
 
 def geocode_address(address: str) -> Optional[tuple[float, float]]:
     if not address:
         return None
+    failed_at = _failed_lookups.get(address)
+    if failed_at is not None and time.monotonic() - failed_at < FAILED_LOOKUP_TTL:
+        return None
+    coordinates = _fetch_coordinates(address)
+    if coordinates is None:
+        _failed_lookups[address] = time.monotonic()
+    return coordinates
 
+
+def _fetch_coordinates(address: str) -> Optional[tuple[float, float]]:
     params = {
         "q": address,
         "autocomplete": 1,
@@ -17,12 +32,12 @@ def geocode_address(address: str) -> Optional[tuple[float, float]]:
         "limit": 1,
     }
     try:
-        response = requests.get(GEOCODER_URL, params=params, timeout=10)
+        response = requests.get(GEOCODER_URL, params=params, timeout=GEOCODER_TIMEOUT)
         response.raise_for_status()
-    except requests.RequestException:
+        data = response.json()
+    except (requests.RequestException, ValueError):
         return None
 
-    data = response.json()
     features = data.get("features") or []
     if not features:
         return None
