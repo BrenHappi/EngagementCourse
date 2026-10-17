@@ -5,6 +5,8 @@ ADMIN_EMAIL=environ.get("ADMIN_EMAIL")
 ADMIN_PASSWORD=environ.get("ADMIN_PASSWORD")
 SECRET_KEY = environ.get("SECRET_KEY")
 
+LOG_LEVEL = (environ.get("LOG_LEVEL") or "INFO").upper()
+
 EXTERNAL_URL = (environ.get("EXTERNAL_URL") or "").rstrip("/") or None
 
 FFC_CALENDAR_URLS = {
@@ -18,6 +20,8 @@ FFC_CALENDAR_URLS = {
 SQLITE_DB_PATH = "data/sqlite.db"
 
 DATE_FORMAT = "%d/%m/%Y"
+
+PASSWORD_RESET_MAX_AGE = 3600  # seconds
 
 # SMTP configuration
 SMTP_HOSTNAME = environ.get("SMTP_HOSTNAME")

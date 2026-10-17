@@ -1,12 +1,16 @@
+import hashlib
 import secrets
 
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from flask import Blueprint, flash, current_app, redirect, request, url_for, render_template, abort
 from flask_login import login_required, login_user, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import HiddenField, PasswordField, SelectField, StringField
 from wtforms.validators import DataRequired, Optional
 
-from engagement_course.models import Category
+from engagement_course import config
+from engagement_course.mail import send_email
+from engagement_course.models import Category, User
 from engagement_course.utils import get_db
 
 auth_bp = Blueprint('auth', __name__)
@@ -26,6 +30,15 @@ class RegisterForm(FlaskForm):
     email = StringField(validators=[DataRequired()])
     password = PasswordField(validators=[DataRequired()])
     address = StringField(validators=[Optional()])
+
+
+class ForgotPasswordForm(FlaskForm):
+    email = StringField(validators=[DataRequired()])
+
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField(validators=[DataRequired()])
+    confirm_password = PasswordField(validators=[DataRequired()])
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -120,3 +133,72 @@ def register():
 
 def has_valid_registration_token(token: str) -> bool:
     return bool(token) and secrets.compare_digest(token, get_db().get_registration_token())
+
+def _password_reset_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(current_app.secret_key, salt="password-reset")
+
+
+def _password_fingerprint(user: User) -> str:
+    # Changes with the password, so a reset link can only be used once
+    password_hash = user.password_hash if isinstance(user.password_hash, bytes) else user.password_hash.encode()
+    return hashlib.sha256(password_hash).hexdigest()[:16]
+
+
+def generate_password_reset_token(user: User) -> str:
+    return _password_reset_serializer().dumps({"id": user.user_id, "pw": _password_fingerprint(user)})
+
+
+def get_user_from_password_reset_token(token: str) -> User | None:
+    try:
+        data = _password_reset_serializer().loads(token, max_age=config.PASSWORD_RESET_MAX_AGE)
+    except (SignatureExpired, BadSignature):
+        return None
+    user = get_db().get_user_by_id(data.get("id"))
+    if user is None or not secrets.compare_digest(_password_fingerprint(user), data.get("pw", "")):
+        return None
+    return user
+
+
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if not current_app.config['notify']:
+        flash("La réinitialisation par email n'est pas disponible, contactez un administrateur")
+        return redirect(url_for('auth.login'))
+
+    form = ForgotPasswordForm()
+    if form.validate_on_submit():
+        user = get_db().get_user_by_email(form.email.data.strip())
+        if user is not None:
+            reset_url = current_app.config['external_url'] + url_for('auth.reset_password', token=generate_password_reset_token(user))
+            send_email(
+                to_address=user.email,
+                subject="Réinitialisation de votre mot de passe",
+                message=f"Bonjour {user.firstname},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :\n{reset_url}\n\n"
+                        f"Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.\n\nCordialement,\nASPTT Rennes"
+            )
+        # Same answer whether the account exists or not, to avoid leaking registered emails
+        flash("Si un compte existe pour cet email, un lien de réinitialisation vient d'être envoyé")
+        return redirect(url_for('auth.login'))
+
+    return render_template('forgot_password.html', form=form)
+
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token: str):
+    user = get_user_from_password_reset_token(token)
+    if user is None:
+        flash("Ce lien de réinitialisation est invalide ou a expiré")
+        return redirect(url_for('auth.forgot_password'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        if form.password.data != form.confirm_password.data:
+            flash("Le mot de passe et sa confirmation ne correspondent pas")
+        else:
+            get_db().update_user(user_id=user.user_id, password=form.password.data)
+            flash("Votre mot de passe a été modifié, vous pouvez maintenant vous connecter")
+            return redirect(url_for('auth.login'))
+    elif request.method == 'POST':
+        flash("Veuillez remplir tous les champs obligatoires")
+
+    return render_template('reset_password.html', form=form, token=token)
