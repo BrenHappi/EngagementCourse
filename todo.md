@@ -61,35 +61,27 @@ Le système de filtre actuel n'est pas très performant et pas très pratique. �
 - affichage beaucoup plus compact, quasi sous forme de tableau pour voir toute les courses 
 
 
-# Bloquants
+# Mise en prod
 
-Secrets exposés/fragiles:
-docker-compose.yaml lit bien les variables, mais .env contient encore des credentials réels (SMTP, admin, secret key). Rotation immédiate des secrets déjà exposés auparavant, surtout SMTP.
-ADMIN_PASSWORD=admin dans .env est inacceptable en prod.
-Reverse proxy non prod:
-Caddyfile est limité à localhost/127.0.0.1 et auto_https off. Pour prod il faut un domaine public + TLS activé.
-URL externe non prod:
-EXTERNAL_URL=http://localhost dans .env. En prod, URL réelle obligatoire pour liens email corrects.
-Image avec vulnérabilités:
-scan signalé sur Dockerfile (base image). Il faut mettre à jour/pinner une image corrigée.
+### Bloquants
+- Secrets: rotation du mot de passe SMTP (déjà exposé), `SECRET_KEY` long et aléatoire, vrai mot de passe admin (à changer depuis le profil si la DB existe déjà, `ADMIN_PASSWORD` n'est lu qu'à la création du compte)
+- Caddyfile: domaine public + TLS (retirer `auto_https off`, ouvrir le port 443 dans le compose)
+- `EXTERNAL_URL` = URL publique dans le `.env` du serveur
+- Dockerfile: mettre à jour / pinner l'image de base (vulnérabilités signalées)
+- ~~Validation de la config au démarrage (`SECRET_KEY`, `EXTERNAL_URL`, admin)~~
 
+### Très important
+- Seed FFC: retirer le seed du démarrage (lancé par chacun des 4 workers), passer par `flask seed-races` en cronjob → couvre aussi "Refresh les calendriers à intervalles régulier"
+- Backups SQLite: cronjob `sqlite3 .backup` quotidien + rotation + copie hors serveur, tester une restauration
+- Reset de mot de passe par email (V2 #4): indispensable avec l'inscription en libre-service
+- ~~Robustesse email: timeout SMTP, un échec d'envoi ne casse plus l'action (log + message à l'admin)~~
+- ~~Création d'engagement en 500 si aucun responsable pour la catégorie~~
+- ~~Lien d'inscription: token stocké en DB (partagé entre workers, survit aux redémarrages), régénérable depuis l'admin~~
 
-# Très important
-
-Robustesse envoi email:
-mail.py n’a pas de timeout ni gestion d’erreurs SMTP. Un échec SMTP ne doit pas casser le flux principal.
-Démarrage applicatif avec effets de bord:
-app.py seed au startup. En prod, éviter les jobs réseau au boot; passer en job planifié/commande dédiée.
-Sauvegardes:
-DB SQLite montée sur volume dans docker-compose.yaml, mais pas de stratégie de backup/restauration automatisée.
-
-
-# Important
-
-Observabilité minimale:
-
-Logs applicatifs structurés, niveau configurable, corrélation requête, rotation/centralisation.
-Santé des services:
-Ajouter healthcheck et politique de redémarrage (restart: unless-stopped) dans docker-compose.yaml.
-Séparation envs:
-Garder docker-compose.override.yaml pour dev, et un fichier compose prod dédié ou pipeline explicite pour éviter les erreurs de lancement.
+### Important
+- Healthcheck: route `/health` + `healthcheck` sur `app` dans le compose
+- Tests: aucun pour l'instant. Priorité: règles d'engagement (J-5, catégorie, droits) et parser FFC
+- Logs: niveau configurable, format exploitable
+- ~~`restart: unless-stopped`~~
+- ~~Séparation dev/prod: profils compose (`--profile dev` / `--profile prod`), override supprimé~~
+- ~~`data/` exclu de l'image Docker~~
