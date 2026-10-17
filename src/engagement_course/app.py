@@ -36,7 +36,6 @@ def create_app() -> Flask:
     db = DatabaseRepository()
     app.config["repository"] = db
     app.config["external_url"] = config.EXTERNAL_URL
-    app.config['registration_token'] = config.REGISTRATION_TOKEN
 
     # SMTP configuration
     app.config['notify'] = config.notify

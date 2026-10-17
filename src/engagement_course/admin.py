@@ -74,7 +74,7 @@ def manage_users():
     db = get_db()
     users = db.list_users()
 
-    registration_url = current_app.config['external_url'] + "/register?_t=" + current_app.config['registration_token']
+    registration_url = current_app.config['external_url'] + "/register?_t=" + db.get_registration_token()
 
     if request.method == "POST":
         action = request.form.get("_action")
@@ -171,6 +171,13 @@ def manage_users():
                         abort(404, description="Utilisateur non trouvé")
                     db.delete_user(user_id)
                     flash(f"Utilisateur {user_id} ({user.username}) supprimé avec succès")
+                    return redirect(url_for("admin.manage_users"))
+
+            case "regenerate_registration_token":
+                form = FlaskForm()
+                if form.validate_on_submit():
+                    db.regenerate_registration_token()
+                    flash("Nouveau lien d'inscription généré, l'ancien lien n'est plus valide")
                     return redirect(url_for("admin.manage_users"))
 
             case _:

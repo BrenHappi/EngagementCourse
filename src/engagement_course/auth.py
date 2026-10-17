@@ -1,3 +1,5 @@
+import secrets
+
 from flask import Blueprint, flash, current_app, redirect, request, url_for, render_template, abort
 from flask_login import login_required, login_user, logout_user, current_user
 from flask_wtf import FlaskForm
@@ -68,6 +70,8 @@ def register():
 
     if request.method == "GET":
         form.registration_token.data = request.args.get("_t", "")
+        if not has_valid_registration_token(form.registration_token.data):
+            abort(403)
 
     if form.validate_on_submit():
         if not has_valid_registration_token(form.registration_token.data):
@@ -115,4 +119,4 @@ def register():
 
 
 def has_valid_registration_token(token: str) -> bool:
-    return token == current_app.config["registration_token"]
+    return bool(token) and secrets.compare_digest(token, get_db().get_registration_token())

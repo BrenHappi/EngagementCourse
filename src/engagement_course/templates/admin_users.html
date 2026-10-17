@@ -59,6 +59,11 @@
 			</button>
 		</div>
 		<p id="copy-feedback" class="copy-feedback" aria-live="polite"></p>
+		<form method="post" action="{{ update_user_url }}" onsubmit="return confirm('L\'ancien lien ne fonctionnera plus. Continuer ?');">
+			<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+			<input type="hidden" name="_action" value="regenerate_registration_token">
+			<button class="button-secondary" type="submit">Régénérer le lien</button>
+		</form>
 		{% if not registration_link %}
 			<div class="empty-state">Le lien s'affichera ici quand la route admin fournira registration_url ou registration_token.</div>
 		{% endif %}

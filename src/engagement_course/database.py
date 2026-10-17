@@ -1,3 +1,4 @@
+import secrets
 import sqlite3
 from bcrypt import hashpw, gensalt
 from typing import Optional
@@ -102,6 +103,14 @@ class DatabaseRepository:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
 
             race_columns = {
                 row["name"]
@@ -143,6 +152,30 @@ class DatabaseRepository:
                     WHERE address IS NULL OR address = ''
                     """
                 )
+
+
+    def get_registration_token(self) -> str:
+        """Returns the registration token, creating it on first call (shared by all workers)."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO settings (key, value) VALUES ('registration_token', ?)",
+                (secrets.token_urlsafe(16),),
+            )
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = 'registration_token'"
+            ).fetchone()
+            return row["value"]
+
+
+    def regenerate_registration_token(self) -> str:
+        """Replaces the registration token, invalidating any previously shared link."""
+        token = secrets.token_urlsafe(16)
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES ('registration_token', ?)",
+                (token,),
+            )
+        return token
 
 
     def replace_races(self, races: list[RaceEvent]) -> None:

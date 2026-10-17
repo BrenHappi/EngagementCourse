@@ -1,4 +1,3 @@
-import secrets
 from os import environ
 
 
@@ -17,8 +16,6 @@ FFC_CALENDAR_URLS = {
 }
 
 SQLITE_DB_PATH = "data/sqlite.db"
-
-REGISTRATION_TOKEN = secrets.token_hex(16)  # V2 -> uses something that can be revoked and regenerated
 
 DATE_FORMAT = "%d/%m/%Y"
 
