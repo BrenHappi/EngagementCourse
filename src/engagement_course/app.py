@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
@@ -34,6 +35,15 @@ def create_app() -> Flask:
     app = Flask(__name__, static_folder="assets")
     app.logger.setLevel(config.LOG_LEVEL)
     app.secret_key = config.SECRET_KEY
+    # Behind Caddy: trust its X-Forwarded-* headers (client IP, https scheme, host)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    https = config.EXTERNAL_URL.startswith("https://")
+    app.config.update(
+        SESSION_COOKIE_SECURE=https,
+        REMEMBER_COOKIE_SECURE=https,
+        SESSION_COOKIE_SAMESITE="Lax",
+        REMEMBER_COOKIE_SAMESITE="Lax",
+    )
     csrf.init_app(app)
     db = DatabaseRepository()
     app.config["repository"] = db

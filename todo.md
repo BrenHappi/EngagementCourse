@@ -59,14 +59,15 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 
 ### Bloquants
 - Secrets: rotation du mot de passe SMTP (déjà exposé), `SECRET_KEY` long et aléatoire, vrai mot de passe admin (à changer depuis le profil si la DB existe déjà, `ADMIN_PASSWORD` n'est lu qu'à la création du compte)
-- Caddyfile: domaine public + TLS (retirer `auto_https off`, ouvrir le port 443 dans le compose)
-- `EXTERNAL_URL` = URL publique dans le `.env` du serveur
+- Louer le droplet et suivre `DEPLOY.md` (pré-prod via sslip.io), puis acheter un domaine pour la prod
+- ~~Caddyfile: HTTPS automatique sur `DOMAIN`, ports 443, certificats persistés~~
+- ~~Cookies `Secure` en HTTPS, ProxyFix derrière Caddy, workers configurables (`WEB_CONCURRENCY`)~~
 - ~~Dockerfile: image de base pinnée (`python:3.12.15-slim-trixie` + digest)~~
 - ~~Validation de la config au démarrage (`SECRET_KEY`, `EXTERNAL_URL`, admin)~~
 
 ### Très important
-- Seed FFC: cronjob `docker compose exec app flask seed-races` pour rafraîchir les courses → couvre "Refresh les calendriers à intervalles régulier" (au boot le seed ne tourne plus qu'une fois grâce à `gunicorn --preload`, et seulement si la DB est vide)
-- Backups SQLite: cronjob `sqlite3 .backup` quotidien + rotation + copie hors serveur, tester une restauration
+- Seed FFC: installer le cronjob documenté dans `DEPLOY.md` (`flask seed-races`) pour rafraîchir les courses → couvre "Refresh les calendriers à intervalles régulier" (au boot le seed ne tourne plus qu'une fois grâce à `gunicorn --preload`, et seulement si la DB est vide)
+- Backups SQLite: installer le cronjob `scripts/backup_db.sh` (quotidien, 14 jours), prévoir la copie hors serveur et tester une restauration
 - ~~Reset de mot de passe par email (lien signé, valable 1h, usage unique)~~
 - ~~Démarrage gunicorn: 4 workers créaient l'admin en parallèle sur DB vide → crash au premier boot (corrigé par `--preload`)~~
 - ~~Robustesse email: timeout SMTP, un échec d'envoi ne casse plus l'action (log + message à l'admin)~~

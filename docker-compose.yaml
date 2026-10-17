@@ -1,5 +1,5 @@
 # Usage:
-#   prod : docker compose --profile prod up -d --build
+#   prod : docker compose --profile prod up -d --build   (see DEPLOY.md)
 #   dev  : docker compose --profile dev up --build    -> http://localhost:8000
 
 x-app-environment: &app-environment
@@ -13,6 +13,7 @@ x-app-environment: &app-environment
   SMTP_USERNAME: ${SMTP_USERNAME}
   SMTP_PASSWORD: ${SMTP_PASSWORD}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
 
 services:
   app:
@@ -31,15 +32,22 @@ services:
 
   server:
     profiles: [prod]
-    image: caddy:2-alpine
+    image: caddy:2.11.7-alpine
     restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-http://localhost}
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"
     depends_on:
       app:
         condition: service_healthy
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates must persist, otherwise each restart asks Let's Encrypt again (rate limited)
+      - caddy_data:/data
+      - caddy_config:/config
 
   # Flask dev server with debugger and auto-reload: never expose publicly
   app-dev:
@@ -53,3 +61,7 @@ services:
     environment:
       <<: *app-environment
       EXTERNAL_URL: http://localhost:8000
+
+volumes:
+  caddy_data:
+  caddy_config:

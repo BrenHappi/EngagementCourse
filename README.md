@@ -10,7 +10,7 @@ Copier `.env.example` en `.env` et le compléter. `SECRET_KEY` et `EXTERNAL_URL`
 
 ```bash
 docker compose --profile dev up --build       # dev: serveur Flask debug sur http://localhost:8000
-docker compose --profile prod up -d --build   # prod: gunicorn + Caddy sur le port 80
+docker compose --profile prod up -d --build   # prod: gunicorn + Caddy (HTTPS), voir DEPLOY.md
 ```
 
 Rafraîchir les courses depuis le calendrier FFC :
