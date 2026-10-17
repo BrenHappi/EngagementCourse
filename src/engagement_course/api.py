@@ -81,17 +81,21 @@ def create_engagement():
 
     try:
         db.create_engagement(user_id=current_user.id, race=race, status=status)
-        manager_email = db.get_manager_for_category(current_user.category).email
-        if current_app.config['notify'] and manager_email and status == EngagementStatus.PENDING:
+    except ValueError:
+        return jsonify({"status": "error", "message": "Failed to create engagement"}), 400  # Duplicate engagement?
+
+    if current_app.config['notify'] and status == EngagementStatus.PENDING:
+        manager = db.get_manager_for_category(current_user.category)
+        if manager is None or not manager.email:
+            current_app.logger.warning("No manager to notify for category %s", current_user.category)
+        else:
             send_email(
-                to_address=manager_email,
+                to_address=manager.email,
                 subject=f"Demande inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}",
                 message=f"Vous avez reçu une nouvelle demande d'inscription de {current_user.firstname} {current_user.lastname} à {race.location} ({race.department}) le {race.date}. "
                         f"Veuillez vous connecter sur {current_app.config['external_url']}/admin pour valider ou refuser cette demande."
             )
-        return jsonify({"status": "success", "message": "Engagement created successfully"}), 201
-    except ValueError:
-        return jsonify({"status": "error", "message": "Failed to create engagement"}), 400  # Duplicate engagement?
+    return jsonify({"status": "success", "message": "Engagement created successfully"}), 201
 
 
 @api_bp.route("/engagement/<int:engagement_id>", methods=["GET"])

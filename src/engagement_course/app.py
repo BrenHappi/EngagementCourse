@@ -30,6 +30,7 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
     return len(races)
 
 def create_app() -> Flask:
+    config.validate()
     app = Flask(__name__, static_folder="assets")
     app.secret_key = config.SECRET_KEY
     csrf.init_app(app)
@@ -44,6 +45,8 @@ def create_app() -> Flask:
         app.config['smtp_port'] = config.SMTP_PORT
         app.config['smtp_username'] = config.SMTP_USERNAME
         app.config['smtp_password'] = config.SMTP_PASSWORD
+    else:
+        app.logger.warning("SMTP not configured: email notifications are disabled")
 
     try:
         seeded_count = seed_races_from_ffc(db)
@@ -53,6 +56,8 @@ def create_app() -> Flask:
         app.logger.exception("FFC seed failed at startup")
 
     if db.get_user_by_id(1) is None:
+        if not (config.ADMIN_EMAIL and config.ADMIN_PASSWORD):
+            raise RuntimeError("ADMIN_EMAIL and ADMIN_PASSWORD are required to create the initial admin account")
         db.create_user(
             firstname="admin",
             lastname="admin",

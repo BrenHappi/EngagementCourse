@@ -220,11 +220,13 @@ def manage_engagements():
             db.update_engagement(engagement_id, status.value)
             flash(f"Engagement {engagement_id} mis à jour avec succès")
             if current_app.config['notify'] and engagement.user.email:
-                send_email(
+                sent = send_email(
                     to_address=engagement.user.email,
                     subject=f"Votre demande d'inscription à {engagement.race.location} a été {status.value}",
                     message=f"Bonjour {engagement.user.firstname},\n\nVotre demande d'inscription à {engagement.race.location} ({engagement.race.department}) le {engagement.race.date} a été {status.value} par l'administrateur.\n\nCordialement,\nASPTT Rennes"
                 )
+                if not sent:
+                    flash(f"L'email de notification n'a pas pu être envoyé à {engagement.user.email}")
             return redirect(url_for("admin.manage_engagements"))
 
     selected_status = request.args.get("status", default=EngagementStatus.PENDING.value)
