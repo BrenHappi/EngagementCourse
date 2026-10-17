@@ -36,6 +36,7 @@ DATE_FORMAT = "%d/%m/%Y"
 TIMEZONE = "Europe/Paris"
 
 PASSWORD_RESET_MAX_AGE = 3600  # seconds
+PASSWORD_MIN_LENGTH = 8
 
 # SMTP configuration
 SMTP_HOSTNAME = environ.get("SMTP_HOSTNAME")

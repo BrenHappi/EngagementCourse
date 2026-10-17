@@ -1,3 +1,8 @@
+import pytest
+
+# Imported before the fixtures replace it with a no-op
+from engagement_course.app import seed_races_from_ffc as real_seed_races_from_ffc
+from engagement_course.ffc_parser import FFCParser
 from engagement_course.models import Category
 from conftest import ADMIN_PASSWORD, USER_PASSWORD, login
 
@@ -73,7 +78,7 @@ def test_registration_generates_free_username(app, db, create_user):
     token = db.get_registration_token()
     response = app.test_client().post("/register", data={
         "registration_token": token, "firstname": "Jean", "lastname": "Dupont", "category": "OPEN_1",
-        "email": "jean@test.fr", "password": "secret", "confirm_password": "secret",
+        "email": "jean@test.fr", "password": "secret-pw", "confirm_password": "secret-pw",
     })
     assert response.status_code == 302
     assert db.get_user_by_email("jean@test.fr").username == "jdupont2"
@@ -83,7 +88,7 @@ def test_registration_requires_matching_passwords(app, db):
     token = db.get_registration_token()
     response = app.test_client().post("/register", data={
         "registration_token": token, "firstname": "Jean", "lastname": "Dupont", "category": "OPEN_1",
-        "email": "jean@test.fr", "password": "secret", "confirm_password": "other",
+        "email": "jean@test.fr", "password": "secret-pw", "confirm_password": "other-pw",
     })
     assert "pas identiques" in response.get_data(as_text=True)
     assert db.get_user_by_email("jean@test.fr") is None
@@ -120,3 +125,57 @@ def test_my_races_lists_every_upcoming_month(app, db, create_user, create_race):
     db.create_engagement(rider, far, "interested")
     html = client_for(app, "rider").get("/?my_engagements=1").get_data(as_text=True)
     assert "Lointaine" in html
+
+
+def test_short_passwords_are_refused(app, db):
+    token = db.get_registration_token()
+    app.test_client().post("/register", data={
+        "registration_token": token, "firstname": "Jean", "lastname": "Dupont", "category": "OPEN_1",
+        "email": "jean@test.fr", "password": "court", "confirm_password": "court",
+    })
+    assert db.get_user_by_email("jean@test.fr") is None
+
+
+def test_rider_cannot_create_odd_statuses(app, create_user, create_race, sent_emails):
+    rider = create_user("rider")
+    client = client_for(app, "rider")
+    for status in ("cancelled", "none"):
+        response = client.post("/api/v1/engagement", json={"user_id": rider, "race_id": create_race().id, "status": status})
+        assert response.status_code == 400
+
+
+def test_pending_request_cannot_be_turned_into_cancelled(app, db, create_user, create_race, sent_emails):
+    rider = create_user("rider")
+    db.create_engagement(rider, create_race(), "pending")
+    engagement_id = db.list_engagements(user_id=rider)[0].id
+    response = client_for(app, "rider").patch(f"/api/v1/engagement/{engagement_id}", json={"status": "cancelled"})
+    assert response.status_code == 400
+    assert db.get_engagement_by_id(engagement_id).status == "pending"
+
+
+def test_empty_ffc_import_keeps_the_calendar(db, monkeypatch, create_race):
+    race = create_race()
+    monkeypatch.setattr(FFCParser, "fetch_calendar", lambda self: "<html></html>")
+    with pytest.raises(RuntimeError):
+        real_seed_races_from_ffc(db, force=True)
+    assert db.get_race_by_id(race.id) is not None
+
+
+def test_profile_password_change(app, create_user):
+    create_user("rider")
+    client = client_for(app, "rider")
+    client.post("/profile", data={"profile-current_password": USER_PASSWORD, "profile-new_password": "nouveau-mdp ",
+                                  "profile-confirm_password": "nouveau-mdp "})
+    # Kept as typed, trailing space included, like the login form sends it
+    assert login(app.test_client(), "rider", "nouveau-mdp ").status_code == 302
+
+
+def test_delete_account_requires_password(app, db, create_user, create_race):
+    rider = create_user("rider")
+    db.create_engagement(rider, create_race(), "interested")
+    client = client_for(app, "rider")
+    client.post("/delete_account", data={"current_password": "mauvais"})
+    assert db.get_user_by_id(rider) is not None
+    client.post("/delete_account", data={"current_password": USER_PASSWORD})
+    assert db.get_user_by_id(rider) is None
+    assert db.list_engagements(user_id=rider) == []

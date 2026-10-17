@@ -3,6 +3,13 @@
 #   local test      : http://localhost                         -> plain HTTP
 {$DOMAIN} {
 	encode gzip
+	header {
+		# No framing of the site (clickjacking), no MIME sniffing, no full URL sent to other sites
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		-Server
+	}
 	# Access log read by fail2ban on the host (see deploy/fail2ban)
 	log {
 		output file /var/log/caddy/access.log {

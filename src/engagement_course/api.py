@@ -77,6 +77,9 @@ def create_engagement():
         return jsonify({"status": "error", "message": "Statut invalide"}), 400
     if status == EngagementStatus.VALIDATED:
         return jsonify({"status": "error", "message": "Action non autorisée"}), 403
+    # A rider only marks his interest or asks for the engagement
+    if status not in (EngagementStatus.INTERESTED, EngagementStatus.PENDING):
+        return jsonify({"status": "error", "message": "Statut invalide"}), 400
 
     try:
         db.create_engagement(user_id=current_user.id, race=race, status=status)
@@ -193,6 +196,11 @@ def update_engagement(engagement_id):
         return jsonify({"status": "error", "message": "Cette demande a été refusée, elle ne peut plus être modifiée"}), 400
     if current_status == EngagementStatus.VALIDATED and new_status != EngagementStatus.CANCELLED:
         return jsonify({"status": "error", "message": "Votre inscription est validée : vous pouvez seulement l'annuler"}), 400
+    # "cancelled" is the withdrawal from a validated race; a pending request is deleted instead
+    if new_status not in (EngagementStatus.INTERESTED, EngagementStatus.PENDING, EngagementStatus.CANCELLED) or (
+        new_status == EngagementStatus.CANCELLED and current_status != EngagementStatus.VALIDATED
+    ):
+        return jsonify({"status": "error", "message": "Statut invalide"}), 400
     asks_engagement = new_status == EngagementStatus.PENDING and current_status != EngagementStatus.PENDING
     if asks_engagement and not engagement.race.is_open_for_engagement(datetime.now()):
         return jsonify({"status": "error", "message": "Les inscriptions sont closes pour cette course"}), 400

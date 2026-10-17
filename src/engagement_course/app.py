@@ -31,6 +31,9 @@ def seed_races_from_ffc(db: DatabaseRepository, force: bool = False) -> int:
         html = parser.fetch_calendar()
         races.extend(parser.parse_calendar(html))
 
+    if not races:
+        # Site down or page layout changed: keep the calendar rather than emptying it
+        raise RuntimeError("No race parsed from the FFC calendar, races left unchanged")
     db.replace_races(races)
     return len(races)
 

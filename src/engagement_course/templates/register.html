@@ -33,6 +33,7 @@
 			<div class="field span-2">
 				<label for="password">Mot de passe</label>
 				{% with field=form.password, field_id="password", required=true, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+				<p class="field-help">8 caractères minimum.</p>
 			</div>
 			<div class="field span-2">
 				<label for="confirm_password">Mot de passe, encore une fois</label>

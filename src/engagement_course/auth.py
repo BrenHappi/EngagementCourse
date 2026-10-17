@@ -11,7 +11,7 @@ from wtforms.validators import DataRequired, Optional
 from engagement_course import config
 from engagement_course.mail import send_email
 from engagement_course.models import Category, User
-from engagement_course.utils import generate_username, get_db
+from engagement_course.utils import generate_username, get_db, password_problem
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -114,6 +114,10 @@ def register():
             flash("Les deux mots de passe ne sont pas identiques", "error")
             return render_template("register.html", form=form)
 
+        if password_problem(password):
+            flash(password_problem(password), "error")
+            return render_template("register.html", form=form)
+
         if db.get_user_by_email(email) is not None:
             flash("Un compte avec cet email existe déjà", "error")
             return render_template("register.html", form=form)
@@ -204,6 +208,8 @@ def reset_password(token: str):
     if form.validate_on_submit():
         if form.password.data != form.confirm_password.data:
             flash("Le mot de passe et sa confirmation ne correspondent pas", "error")
+        elif password_problem(form.password.data):
+            flash(password_problem(form.password.data), "error")
         else:
             get_db().update_user(user_id=user.user_id, password=form.password.data)
             flash("Votre mot de passe a été modifié, vous pouvez maintenant vous connecter")

@@ -129,21 +129,31 @@
 						<span class="race-main">
 							<span class="race-title">{{ race.display_location }}</span>
 							<span class="race-meta">
+								{%- if not race.is_open and not is_past and status in ['none', 'interested'] %}<span class="meta-closed">Closes · </span>{% endif -%}
 								{%- if status == 'validated' %}<b class="st st-validated">✓ Inscrit</b> · {% elif status == 'pending' %}<b class="st st-pending">En attente</b> · {% elif status == 'cancelled' %}<b class="st st-cancelled">Refusée</b> · {% elif status == 'interested' %}<b class="st st-interested">★</b> {% endif -%}
 								{{ race.department }}{% if race.distance_km is not none %} · {{ "%.0f"|format(race.distance_km) }} km{% endif %} · {{ race.type_label }}
-								{%- if riders %} · {{ icon('users') }}{{ riders|length }}{% endif -%}
+								{%- if riders %} · <span class="club">{{ icon('users') }}{{ riders|length }} du club</span>{% endif -%}
 							</span>
 						</span>
 						<span class="race-side">
 							{% if status in ['validated', 'pending', 'cancelled'] or is_past %}
-							{% elif race.is_open and status == 'none' %}
-								<button type="button" class="btn btn-sm" data-engage="POST" data-race="{{ race.id }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
-							{% elif race.is_open %}
-								<button type="button" class="btn btn-sm" data-engage="PATCH" data-url="{{ update_url }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
 							{% else %}
-								<span class="closed">Closes</span>
+								{# Star: "ça m'intéresse", tells the club mates without asking for the engagement yet #}
+								{% if status == 'interested' %}
+									<button type="button" class="btn btn-secondary btn-sm btn-star is-on" data-engage="DELETE" data-url="{{ delete_url }}" data-done="Course retirée de « Mes courses »." aria-label="Ça ne m'intéresse plus" title="Ça ne m'intéresse plus"><span class="star">★</span><span class="star-label">Intéressé</span></button>
+								{% elif race.is_open %}
+									<button type="button" class="btn btn-secondary btn-sm btn-star" data-engage="POST" data-race="{{ race.id }}" data-status="interested" data-done="Course ajoutée à « Mes courses »." aria-label="Ça m'intéresse" title="Ça m'intéresse"><span class="star">☆</span><span class="star-label">Ça m'intéresse</span><span class="star-label-short">Intéressé</span></button>
+								{% endif %}
+								{% if not race.is_open %}
+									<span class="closed">Closes</span>
+								{% elif status == 'none' %}
+									<button type="button" class="btn btn-sm" data-engage="POST" data-race="{{ race.id }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
+								{% else %}
+									<button type="button" class="btn btn-sm" data-engage="PATCH" data-url="{{ update_url }}" data-status="pending" data-done="Demande envoyée ! Le responsable va la valider.">S'inscrire</button>
+								{% endif %}
 							{% endif %}
 						</span>
+						<span class="race-chevron" aria-hidden="true"></span>
 					</summary>
 
 					<div class="race-more">
@@ -174,11 +184,7 @@
 
 						{% if not is_past %}
 							<div class="race-actions">
-								{% if status == 'none' and race.is_open %}
-									<button type="button" class="btn btn-secondary btn-sm" data-engage="POST" data-race="{{ race.id }}" data-status="interested" data-done="Course ajoutée à « Mes courses ».">☆ Ça m'intéresse</button>
-								{% elif status == 'interested' %}
-									<button type="button" class="btn btn-secondary btn-sm" data-engage="DELETE" data-url="{{ delete_url }}" data-done="Course retirée de « Mes courses ».">Ça ne m'intéresse plus</button>
-								{% elif status == 'pending' %}
+								{% if status == 'pending' %}
 									<button type="button" class="btn btn-danger btn-sm" data-engage="DELETE" data-url="{{ delete_url }}" data-confirm="Annuler votre demande d'inscription à {{ race.display_location }} ?" data-done="Demande annulée.">Annuler ma demande</button>
 								{% elif status == 'validated' %}
 									<button type="button" class="btn btn-danger btn-sm" data-engage="PATCH" data-url="{{ update_url }}" data-status="cancelled" data-confirm="Vous êtes inscrit à {{ race.display_location }}. Annuler votre participation ? Votre responsable sera prévenu." data-done="Participation annulée, votre responsable est prévenu.">Annuler ma participation</button>

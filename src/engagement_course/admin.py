@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from wtforms import HiddenField, PasswordField, SelectField, SelectMultipleField, StringField
 from wtforms.validators import DataRequired, Optional
 from engagement_course.mail import send_email
-from engagement_course.utils import generate_username, get_db
+from engagement_course.utils import generate_username, get_db, password_problem
 from engagement_course.models import CATEGORIES, Category, EngagementStatus
 
 admin_bp = Blueprint("admin", __name__)
@@ -100,6 +100,9 @@ def manage_users():
 
                     if not all([firstname, lastname, email, password, role]):
                         flash("Tous les champs sont requis pour créer un utilisateur", "error")
+                        return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
+                    if password_problem(password):
+                        flash(password_problem(password), "error")
                         return render_template("admin_users.html",users=users,registration_url=registration_url,available_category_filters=CATEGORIES)
                     if db.get_user_by_email(email):
                         flash("Un utilisateur avec cet email existe déjà", "error")

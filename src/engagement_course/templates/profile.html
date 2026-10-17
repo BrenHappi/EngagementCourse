@@ -86,6 +86,7 @@
 				<div class="field">
 					<label for="profile-new_password">Nouveau mot de passe</label>
 					{% with field=profile_form.new_password, field_id="profile-new_password", required=false, autocomplete="new-password" %}{% include "partials/password_field.html" %}{% endwith %}
+					<p class="field-help">8 caractères minimum.</p>
 				</div>
 				<div class="field">
 					<label for="profile-confirm_password">Nouveau mot de passe, encore une fois</label>

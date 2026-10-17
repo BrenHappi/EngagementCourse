@@ -64,7 +64,7 @@ def test_create_admin_with_managed_categories(admin_client, db):
         "firstname": "Anne",
         "lastname": "Chef",
         "email": "anne@test.fr",
-        "password": "pw",
+        "password": "provisoire",
         "role": "admin",
         "managed_categories": ["ACCESS_3", "ACCESS_4"],
     })

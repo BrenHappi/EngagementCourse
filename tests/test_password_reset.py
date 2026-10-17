@@ -26,10 +26,10 @@ def test_full_reset_flow(app, rider, sent_emails):
 
     link = reset_link(sent_emails)
     assert client.get(link).status_code == 200
-    response = client.post(link, data={"password": "new-pw", "confirm_password": "new-pw"})
+    response = client.post(link, data={"password": "new-password", "confirm_password": "new-password"})
     assert response.status_code == 302
 
-    assert login(app.test_client(), "rider", "new-pw").status_code == 302
+    assert login(app.test_client(), "rider", "new-password").status_code == 302
     assert "incorrect" in login(app.test_client(), "rider").get_data(as_text=True)
 
 
@@ -37,7 +37,7 @@ def test_reset_link_is_single_use(app, rider, sent_emails):
     client = app.test_client()
     request_reset(client, "rider@test.fr")
     link = reset_link(sent_emails)
-    client.post(link, data={"password": "new-pw", "confirm_password": "new-pw"})
+    client.post(link, data={"password": "new-password", "confirm_password": "new-password"})
 
     response = client.get(link, follow_redirects=True)
     assert "invalide ou a expiré" in response.get_data(as_text=True)

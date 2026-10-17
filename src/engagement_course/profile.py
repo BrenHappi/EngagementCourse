@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, SelectField, StringField, SelectMultipleField, SubmitField
 from wtforms.validators import Optional, DataRequired
-from engagement_course.utils import get_db
+from engagement_course.utils import get_db, password_problem
 from engagement_course.models import Category, RecapSettings, WEEKDAY_LABELS
 
 profile_bp = Blueprint("profile", __name__)
@@ -86,9 +86,10 @@ def profile():
                 if category_option is not None
             ]
             
-            current_password = profile_form.current_password.data.strip() if profile_form.current_password.data else None
-            new_password = profile_form.new_password.data.strip() if profile_form.new_password.data else None
-            confirm_password = profile_form.confirm_password.data.strip() if profile_form.confirm_password.data else None
+            # Not stripped: the login form does not strip them either
+            current_password = profile_form.current_password.data or None
+            new_password = profile_form.new_password.data or None
+            confirm_password = profile_form.confirm_password.data or None
             password_change_requested = any([current_password, new_password, confirm_password])
             
             email_owner = db.get_user_by_email(email)
@@ -103,6 +104,8 @@ def profile():
                 flash("Mot de passe actuel incorrect", "error")
             elif password_change_requested and new_password != confirm_password:
                 flash("Le nouveau mot de passe et sa confirmation ne correspondent pas", "error")
+            elif password_change_requested and password_problem(new_password):
+                flash(password_problem(new_password), "error")
             else:
                 db.update_user(
                     user_id=user.user_id,

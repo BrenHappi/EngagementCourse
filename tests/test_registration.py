@@ -8,8 +8,8 @@ def register(client, token, email="new@test.fr"):
         "lastname": "Dupont",
         "category": "OPEN_1",
         "email": email,
-        "password": "secret",
-        "confirm_password": "secret",
+        "password": "secret-pw",
+        "confirm_password": "secret-pw",
     })
 
 
