@@ -61,6 +61,8 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # The DEPLOY_* secrets are environment secrets: a job only gets them by naming it
+    environment: ci-cd
     steps:
       - name: Run the deploy script on the server
         # Connects as the user that owns the checkout, not root: the repository
