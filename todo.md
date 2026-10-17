@@ -59,7 +59,7 @@ Objectif: permettre aux utilisateurs du club de s'enregistrer sur les courses du
 
 ### Bloquants
 - Secrets: rotation du mot de passe SMTP (déjà exposé), `SECRET_KEY` long et aléatoire, vrai mot de passe admin (à changer depuis le profil si la DB existe déjà, `ADMIN_PASSWORD` n'est lu qu'à la création du compte)
-- Louer le droplet et suivre `DEPLOY.md` (pré-prod via sslip.io), puis acheter un domaine pour la prod
+- Déployer la pré-prod en suivant `DEPLOY.md`, puis passer sur un vrai domaine pour la prod
 - ~~Caddyfile: HTTPS automatique sur `DOMAIN`, ports 443, certificats persistés~~
 - ~~Cookies `Secure` en HTTPS, ProxyFix derrière Caddy, workers configurables (`WEB_CONCURRENCY`)~~
 - ~~Dockerfile: image de base pinnée (`python:3.12.15-slim-trixie` + digest)~~

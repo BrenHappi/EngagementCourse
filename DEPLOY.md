@@ -1,64 +1,66 @@
-# Déploiement (pré-prod / prod)
+# Déploiement
 
-Serveur cible : un droplet DigitalOcean, avec Docker, Caddy en frontal (HTTPS automatique) et SQLite sur un volume.
+L'application tourne sur n'importe quel serveur Linux avec Docker. Caddy est en frontal avec le HTTPS automatique, et la base SQLite est stockée dans `data/`.
 
-## 1. Créer le droplet
+Dans ce guide, `<IP>` désigne l'IP publique du serveur (l'exemple utilisé est `203.0.113.10`), `<REPO_URL>` l'URL du dépôt Git, et `<APP_DIR>` le dossier d'installation (par exemple `/opt/engagement-course`).
 
-- Image **Ubuntu 24.04 LTS**, offre **Basic 512 Mo** (4 $/mois). Elle suffit pour le club, à condition d'ajouter de la swap (étape 3).
-- Authentification : **clé SSH** (pas de mot de passe).
-- Option recommandée : **Backups** DigitalOcean (instantané hebdomadaire de tout le serveur, +20 %).
-- Noter l'IP publique, par exemple `164.90.12.34`.
+## 1. Serveur
+
+- Linux récent (par exemple Ubuntu LTS), accessible en SSH par clé.
+- **512 Mo de RAM minimum**, avec de la swap (voir l'étape 3). 1 Go est plus confortable.
+- 10 Go de disque suffisent.
 
 ## 2. Pare-feu
 
-Dans DigitalOcean → Networking → **Firewalls**, créer un pare-feu attaché au droplet :
+N'ouvrir que ces ports en entrée :
 
-| Entrant | Port |
+| Service | Port |
 |---|---|
 | SSH | 22 |
 | HTTP | 80 (nécessaire pour obtenir le certificat) |
 | HTTPS | 443 TCP + UDP |
 
-Utiliser le pare-feu DigitalOcean plutôt que `ufw` : Docker contourne les règles `ufw` pour les ports qu'il publie.
+Utiliser le pare-feu de l'hébergeur plutôt que `ufw` : Docker contourne les règles `ufw` pour les ports qu'il publie.
 
 ## 3. Installer Docker et récupérer le code
 
 ```bash
-ssh root@164.90.12.34
-
-# 1 Go de swap : évite que le build de l'image manque de mémoire sur 512 Mo
+# Swap de 1 Go : évite que le build de l'image manque de mémoire sur un petit serveur
 fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 curl -fsSL https://get.docker.com | sh
 
-# Clé de déploiement en lecture seule : ssh-keygen -t ed25519, puis ajouter la clé publique
-# dans GitHub → repo → Settings → Deploy keys
-git clone git@github.com:BrenHappi/EngagementCourse.git /opt/EngagementCourse
-cd /opt/EngagementCourse
+git clone <REPO_URL> <APP_DIR>
+cd <APP_DIR>
 ```
+
+Si le dépôt est privé, utiliser une deploy key en lecture seule (`ssh-keygen -t ed25519`, puis ajouter la clé publique dans les paramètres du dépôt).
 
 ## 4. Configurer le `.env`
 
 ```bash
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_hex(32))"   # -> SECRET_KEY
-nano .env
 ```
-
-Sans nom de domaine, utiliser **sslip.io** : `164-90-12-34.sslip.io` pointe automatiquement vers `164.90.12.34`.
 
 ```env
 COMPOSE_PROFILES=prod
-DOMAIN=164-90-12-34.sslip.io
-EXTERNAL_URL=https://164-90-12-34.sslip.io
+DOMAIN=<nom de domaine>
+EXTERNAL_URL=https://<nom de domaine>
 SECRET_KEY=<valeur générée>
-ADMIN_EMAIL=<ton email>
+ADMIN_EMAIL=<email de l'administrateur>
 ADMIN_PASSWORD=<mot de passe fort>
-SMTP_...=<identifiants SMTP, mot de passe d'application régénéré>
+SMTP_HOSTNAME=...
+SMTP_USERNAME=...
+SMTP_PASSWORD=...
 ```
 
-`DOMAIN` est le nom servi par Caddy, sans `https://`. `EXTERNAL_URL` est l'URL utilisée dans les emails et le lien d'inscription. Avec `COMPOSE_PROFILES=prod`, `docker compose up -d` lance la prod sans `--profile`. Ne mettre cette ligne que dans le `.env` du serveur.
+- `DOMAIN` est le nom servi par Caddy, sans `https://`.
+- `EXTERNAL_URL` est l'URL utilisée dans les emails et le lien d'inscription.
+- `COMPOSE_PROFILES=prod` permet de lancer la prod avec `docker compose up -d`, sans `--profile`. Ne mettre cette ligne que dans le `.env` du serveur.
+
+**Sans nom de domaine**, utiliser [sslip.io](https://sslip.io) : `203-0-113-10.sslip.io` pointe automatiquement vers `203.0.113.10`, et Caddy peut obtenir un vrai certificat pour ce nom. Il suffit donc de mettre `DOMAIN=<IP avec des tirets>.sslip.io`.
 
 ## 5. Lancer
 
@@ -68,23 +70,23 @@ docker compose ps                 # app doit passer "healthy", puis server déma
 docker compose logs -f server     # obtention du certificat Let's Encrypt
 ```
 
-Ouvrir `https://164-90-12-34.sslip.io`, se connecter avec le compte admin, puis récupérer le lien d'inscription dans Administration → Utilisateurs.
+Ouvrir `https://<nom de domaine>`, se connecter avec le compte admin, puis récupérer le lien d'inscription dans Administration → Utilisateurs.
 
 Au premier démarrage, la base est créée et les courses FFC importées.
 
 ## 6. Tâches planifiées
 
-`crontab -e` (en root) :
+`crontab -e` (en root), en remplaçant `<APP_DIR>` :
 
 ```cron
 # Import des courses FFC, chaque nuit
-30 2 * * * cd /opt/EngagementCourse && docker compose exec -T app flask seed-races >> /var/log/engagement-seed.log 2>&1
+30 2 * * * cd <APP_DIR> && docker compose exec -T app flask seed-races >> /var/log/engagement-seed.log 2>&1
 # Sauvegarde SQLite (data/backups/, 14 jours conservés)
-0 3 * * * /opt/EngagementCourse/scripts/backup_db.sh >> /var/log/engagement-backup.log 2>&1
+0 3 * * * <APP_DIR>/scripts/backup_db.sh >> /var/log/engagement-backup.log 2>&1
 ```
 
-Les sauvegardes restent sur le serveur. Pour en avoir une copie ailleurs, les rapatrier de temps en temps :
-`scp root@164.90.12.34:/opt/EngagementCourse/data/backups/sqlite-*.db ./backups/`
+Les sauvegardes restent sur le serveur. Pour en avoir une copie ailleurs, les rapatrier régulièrement :
+`scp root@<IP>:<APP_DIR>/data/backups/sqlite-*.db ./backups/`
 
 Restaurer une sauvegarde :
 
@@ -97,20 +99,20 @@ docker compose start app
 ## Mettre à jour
 
 ```bash
-cd /opt/EngagementCourse
+cd <APP_DIR>
 git pull
 docker compose up -d --build
-docker image prune -f   # libère l'espace des anciennes images (disque de 10 Go)
+docker image prune -f   # libère l'espace des anciennes images
 ```
 
-## Passer à un vrai domaine
+## Changer de nom de domaine
 
-1. Créer un enregistrement DNS `A` qui pointe vers l'IP du droplet.
-2. Dans `.env`, mettre `DOMAIN=mon-domaine.fr` et `EXTERNAL_URL=https://mon-domaine.fr`.
+1. Faire pointer le nouveau domaine (enregistrement DNS `A`) vers l'IP du serveur.
+2. Mettre à jour `DOMAIN` et `EXTERNAL_URL` dans `.env`.
 3. Lancer `docker compose up -d`. Caddy obtient le nouveau certificat tout seul.
-4. Régénérer le lien d'inscription dans l'admin, puisque l'ancien pointe vers sslip.io.
+4. Régénérer le lien d'inscription dans l'admin, puisque l'ancien pointe vers l'ancien domaine.
 
 ## Dépannage
 
-- **Pas de certificat :** vérifier que les ports 80 et 443 sont ouverts dans le pare-feu, et regarder `docker compose logs server`. Avec sslip.io, les quotas Let's Encrypt sont partagés entre tous ses utilisateurs : en cas d'erreur `rateLimited`, réessayer plus tard.
+- **Pas de certificat :** vérifier que les ports 80 et 443 sont ouverts, puis regarder `docker compose logs server`. Avec sslip.io, les quotas Let's Encrypt sont partagés entre tous ses utilisateurs : en cas d'erreur `rateLimited`, réessayer plus tard.
 - **L'app ne démarre pas :** lancer `docker compose logs app`. Une variable obligatoire manquante est indiquée explicitement.

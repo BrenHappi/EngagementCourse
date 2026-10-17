@@ -1,5 +1,5 @@
 # DOMAIN comes from .env:
-#   pre-prod / prod : 164-90-12-34.sslip.io or club-domain.fr -> automatic HTTPS (Let's Encrypt)
+#   pre-prod / prod : <ip-with-dashes>.sslip.io or example.org -> automatic HTTPS (Let's Encrypt)
 #   local test      : http://localhost                         -> plain HTTP
 {$DOMAIN} {
 	encode gzip

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Daily SQLite backup into data/backups/, keeps the last 14 days.
-# Cron (as root): 0 3 * * * /opt/EngagementCourse/scripts/backup_db.sh >> /var/log/engagement-backup.log 2>&1
+# Cron (as root): 0 3 * * * <APP_DIR>/scripts/backup_db.sh >> /var/log/engagement-backup.log 2>&1
 set -eu
 cd "$(dirname "$0")/.."
 
