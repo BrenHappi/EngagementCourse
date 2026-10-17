@@ -1,5 +1,5 @@
 # Usage:
-#   prod : docker compose --profile prod up -d --build   (see DEPLOY.md)
+#   prod : docker compose --profile prod up -d           (image built by CI, see DEPLOY.md)
 #   dev  : docker compose --profile dev up --build    -> http://localhost:8000
 
 x-app-environment: &app-environment
@@ -18,6 +18,10 @@ x-app-environment: &app-environment
 services:
   app:
     profiles: [prod]
+    # Built and pushed to GHCR by .github/workflows/deploy.yml.
+    # APP_TAG=<commit sha> in .env pins or rolls back to an older build.
+    image: ghcr.io/brenhappi/engagementcourse:${APP_TAG:-latest}
+    # Kept so the image can still be rebuilt locally with --build
     build: .
     volumes:
       - ./data:/app/data

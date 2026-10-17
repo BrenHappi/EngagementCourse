@@ -13,6 +13,8 @@ docker compose --profile dev up --build       # dev: serveur Flask debug sur htt
 docker compose --profile prod up -d --build   # prod: gunicorn + Caddy (HTTPS), voir DEPLOY.md
 ```
 
+En production, le déploiement est automatique : un push sur `main` lance les tests, construit l'image et la déploie sur le serveur (voir DEPLOY.md).
+
 Rafraîchir les courses depuis le calendrier FFC :
 
 ```bash
