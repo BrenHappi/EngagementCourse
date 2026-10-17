@@ -45,6 +45,8 @@ services:
         condition: service_healthy
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Access log on the host, for fail2ban
+      - /var/log/caddy:/var/log/caddy
       # Certificates must persist, otherwise each restart asks Let's Encrypt again (rate limited)
       - caddy_data:/data
       - caddy_config:/config

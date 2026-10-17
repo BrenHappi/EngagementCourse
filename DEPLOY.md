@@ -96,12 +96,45 @@ cp data/backups/sqlite-AAAAMMJJ.db data/sqlite.db
 docker compose start app
 ```
 
+## 7. fail2ban
+
+Caddy écrit ses logs d'accès dans `/var/log/caddy/access.log` sur l'hôte. Deux prisons s'appuient dessus :
+
+| Prison | Déclencheur | Bannissement |
+|---|---|---|
+| `caddy-login` | 5 échecs de connexion en 10 min | 1 h |
+| `caddy-scan` | 3 requêtes de scanner en 10 min (`.php`, `.env`, `/.git`, `wp-`…) | 1 jour |
+
+Les ports publiés par Docker ne passent pas par la chaîne `INPUT`. Les bannissements sont donc ajoutés dans la chaîne `DOCKER-USER`, et fail2ban doit démarrer après Docker.
+
+```bash
+sudo apt install fail2ban
+sudo cp deploy/fail2ban/filter.d/*.conf /etc/fail2ban/filter.d/
+sudo cp deploy/fail2ban/jail.d/*.conf /etc/fail2ban/jail.d/
+
+sudo mkdir -p /etc/systemd/system/fail2ban.service.d
+printf '[Unit]\nAfter=docker.service\nWants=docker.service\n' | sudo tee /etc/systemd/system/fail2ban.service.d/docker.conf
+sudo systemctl daemon-reload
+sudo systemctl restart fail2ban
+
+sudo fail2ban-client status caddy-login
+sudo fail2ban-client status caddy-scan
+```
+
+Commandes utiles :
+
+```bash
+sudo fail2ban-regex /var/log/caddy/access.log /etc/fail2ban/filter.d/caddy-scan.conf   # tester un filtre
+sudo fail2ban-client set caddy-scan unbanip <IP>                                     # débannir une IP
+```
+
 ## Mettre à jour
 
 ```bash
 cd <APP_DIR>
 git pull
 docker compose up -d --build
+# si deploy/fail2ban a changé : recopier les fichiers, puis sudo systemctl reload fail2ban
 docker image prune -f   # libère l'espace des anciennes images
 ```
 

@@ -3,5 +3,15 @@
 #   local test      : http://localhost                         -> plain HTTP
 {$DOMAIN} {
 	encode gzip
+	# Access log read by fail2ban on the host (see deploy/fail2ban)
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format json {
+			time_format iso8601
+		}
+	}
 	reverse_proxy app:8000
 }
