@@ -1,6 +1,6 @@
 # EngagementCourse
 
-Application de demande d'engagement aux courses FFC pour les coureurs de l'ASPTT.
+Application pour faciliter les demanded d'engagement aux courses FFC a destination de club cyclistes.
 
 ## Configuration
 
